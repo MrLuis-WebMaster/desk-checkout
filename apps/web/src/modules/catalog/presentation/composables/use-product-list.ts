@@ -2,6 +2,7 @@ import { onScopeDispose, ref, watch, type Ref } from "vue";
 import type { ListProductsQuery, ProductSummaryDto } from "@checkout/contracts";
 import { listProducts } from "@/modules/catalog/composition/index";
 import { screenMessage } from "@/modules/catalog/application/results/screen-result";
+import { createAbortScope } from "@/modules/catalog/presentation/composables/abort-scope";
 
 export function useProductList(query: Ref<ListProductsQuery>) {
   const items = ref<ProductSummaryDto[]>([]);
@@ -10,12 +11,10 @@ export function useProductList(query: Ref<ListProductsQuery>) {
   const prevCursor = ref<string | null>(null);
   const loading = ref(false);
   const errorMessage = ref("");
-  let loadAbort: AbortController | null = null;
+  const abortScope = createAbortScope();
 
   async function load(current: ListProductsQuery) {
-    loadAbort?.abort();
-    const controller = new AbortController();
-    loadAbort = controller;
+    const controller = abortScope.start();
 
     loading.value = true;
     errorMessage.value = "";
@@ -50,7 +49,7 @@ export function useProductList(query: Ref<ListProductsQuery>) {
   );
 
   onScopeDispose(() => {
-    loadAbort?.abort();
+    abortScope.dispose();
   });
 
   return {

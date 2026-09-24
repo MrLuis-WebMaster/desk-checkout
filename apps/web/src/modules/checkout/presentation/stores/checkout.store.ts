@@ -7,6 +7,12 @@ export const CHECKOUT_STEPS = [
   "result",
 ] as const;
 
+export const CHECKOUT_SCREEN_STEPS = [
+  { id: "product", label: "Product" },
+  { id: "payment", label: "Payment" },
+  { id: "summary", label: "Summary" },
+] as const;
+
 export type CheckoutStep = (typeof CHECKOUT_STEPS)[number];
 
 export const useCheckoutStore = defineStore("checkout", {
@@ -15,10 +21,6 @@ export const useCheckoutStore = defineStore("checkout", {
     productId: "",
   }),
   actions: {
-    openProduct(productId: string) {
-      this.productId = productId;
-      this.step = "product";
-    },
     startPayment(productId: string) {
       this.productId = productId;
       this.step = "payment";
