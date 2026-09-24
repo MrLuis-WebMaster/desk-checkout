@@ -1,6 +1,7 @@
 import type { ProductSummaryDto } from "@checkout/contracts";
 import {
   encodeProductCursor,
+  normalizeCursorQ,
   type ProductOrder,
   type ProductSort,
 } from "./product-cursor.js";
@@ -18,6 +19,7 @@ export function buildProductPageCursors(input: {
   items: readonly ProductSummaryDto[];
   sort: ProductSort;
   order: ProductOrder;
+  q: string | undefined;
   goingBackward: boolean;
   hasExtra: boolean;
   usedAfter: boolean;
@@ -29,18 +31,21 @@ export function buildProductPageCursors(input: {
     return { nextCursor: null, prevCursor: null };
   }
 
-  // Forward peek (`hasExtra`) or any successful `before` page (there is always
-  // a forward neighbor past that page toward the original cursor).
   const hasNext = input.goingBackward || input.hasExtra;
-  // Backward peek, or we already moved forward via `after` / offset page > 1.
   const hasPrev =
     (input.goingBackward && input.hasExtra) ||
     input.usedAfter ||
     input.offsetPageNumber > 1;
 
+  const q = normalizeCursorQ(input.q);
+
   return {
-    nextCursor: hasNext ? cursorFromItem(last, input.sort, input.order) : null,
-    prevCursor: hasPrev ? cursorFromItem(first, input.sort, input.order) : null,
+    nextCursor: hasNext
+      ? cursorFromItem(last, input.sort, input.order, q)
+      : null,
+    prevCursor: hasPrev
+      ? cursorFromItem(first, input.sort, input.order, q)
+      : null,
   };
 }
 
@@ -48,10 +53,12 @@ function cursorFromItem(
   item: ProductSummaryDto,
   sort: ProductSort,
   order: ProductOrder,
+  q: string,
 ): string {
   return encodeProductCursor({
     sort,
     order,
+    q,
     name: item.name,
     price: item.price,
     id: item.id,

@@ -105,6 +105,7 @@ export class TypeOrmProductReader extends ProductReader {
       items,
       sort: query.sort,
       order: query.order,
+      q: query.q,
       goingBackward,
       hasExtra,
       usedAfter: Boolean(query.after),

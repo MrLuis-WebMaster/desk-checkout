@@ -10,6 +10,7 @@ import {
 } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
+  PRODUCT_LIST_OFFSET_PAGE_MAX,
   PRODUCT_LIST_PAGE_SIZE,
   PRODUCT_ORDERS,
   PRODUCT_SORTS,
@@ -69,16 +70,16 @@ export class ListProductsQueryDto {
 
   @ApiPropertyOptional({
     minimum: 1,
-    maximum: 100,
+    maximum: PRODUCT_LIST_OFFSET_PAGE_MAX,
     default: 1,
     type: Number,
     description:
-      "Página 1-based (offset). Solo cuando no se envían `after`/`before`.",
+      "Página 1-based (offset). Solo cuando no se envían `after`/`before`. Máximo alineado con PRODUCT_LIST_OFFSET_PAGE_MAX; más allá usa cursores.",
   })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  @Max(100)
+  @Max(PRODUCT_LIST_OFFSET_PAGE_MAX)
   page?: number;
 }

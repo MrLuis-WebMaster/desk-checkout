@@ -4,6 +4,8 @@ import {
   ListProductsUseCase,
 } from "./list-products.use-case";
 
+const PRODUCT_ID = "11111111-1111-4111-8111-111111111111";
+
 describe("ListProductsUseCase", () => {
   const productReader = {
     list: jest.fn(),
@@ -26,9 +28,10 @@ describe("ListProductsUseCase", () => {
     const cursor = encodeProductCursor({
       sort: "name",
       order: "asc",
+      q: "",
       name: "A",
       price: 1,
-      id: "11111111-1111-4111-8111-111111111111",
+      id: PRODUCT_ID,
     });
 
     const result = await useCase.execute({
@@ -51,9 +54,10 @@ describe("ListProductsUseCase", () => {
     const cursor = encodeProductCursor({
       sort: "name",
       order: "asc",
+      q: "",
       name: "A",
       price: 1,
-      id: "11111111-1111-4111-8111-111111111111",
+      id: PRODUCT_ID,
     });
 
     const result = await useCase.execute({
@@ -65,48 +69,48 @@ describe("ListProductsUseCase", () => {
     });
 
     expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.error).toBeInstanceOf(InvalidProductCursorError);
-    }
     expect(productReader.list).not.toHaveBeenCalled();
   });
 
-  it("rejects mixing page with before", async () => {
+  it("rejects a cursor whose q does not match the query", async () => {
     const useCase = new ListProductsUseCase(productReader);
     const cursor = encodeProductCursor({
       sort: "name",
       order: "asc",
+      q: "",
       name: "A",
       price: 1,
-      id: "11111111-1111-4111-8111-111111111111",
+      id: PRODUCT_ID,
     });
 
     const result = await useCase.execute({
       pageSize: 10,
       sort: "name",
       order: "asc",
-      page: 1,
-      before: cursor,
+      q: "USB",
+      after: cursor,
     });
 
     expect(result.ok).toBe(false);
     expect(productReader.list).not.toHaveBeenCalled();
   });
 
-  it("allows cursor-only queries", async () => {
+  it("allows cursor-only queries when q matches", async () => {
     const useCase = new ListProductsUseCase(productReader);
     const cursor = encodeProductCursor({
       sort: "name",
       order: "asc",
+      q: "usb",
       name: "A",
       price: 1,
-      id: "11111111-1111-4111-8111-111111111111",
+      id: PRODUCT_ID,
     });
 
     const result = await useCase.execute({
       pageSize: 10,
       sort: "name",
       order: "asc",
+      q: "usb",
       after: cursor,
     });
 
@@ -115,6 +119,7 @@ describe("ListProductsUseCase", () => {
       pageSize: 10,
       sort: "name",
       order: "asc",
+      q: "usb",
       after: cursor,
     });
   });

@@ -1,7 +1,10 @@
 import { Injectable } from "@nestjs/common";
 import type { ProductPageDto } from "@checkout/contracts";
 import { err, ok, type Result } from "#shared/result/result.js";
-import { decodeProductCursor } from "../queries/product-cursor.js";
+import {
+  decodeProductCursor,
+  normalizeCursorQ,
+} from "../queries/product-cursor.js";
 import {
   ProductReader,
   type ListProductsQuery,
@@ -9,6 +12,20 @@ import {
 
 export class InvalidProductCursorError {
   readonly code = "VALIDATION_ERROR" as const;
+}
+
+function cursorMatchesQuery(
+  cursor: ReturnType<typeof decodeProductCursor>,
+  query: ListProductsQuery,
+): boolean {
+  if (!cursor) {
+    return false;
+  }
+  return (
+    cursor.sort === query.sort &&
+    cursor.order === query.order &&
+    cursor.q === normalizeCursorQ(query.q)
+  );
 }
 
 @Injectable()
@@ -26,13 +43,13 @@ export class ListProductsUseCase {
     }
     if (query.after) {
       const cursor = decodeProductCursor(query.after);
-      if (!cursor || cursor.sort !== query.sort || cursor.order !== query.order) {
+      if (!cursorMatchesQuery(cursor, query)) {
         return err(new InvalidProductCursorError());
       }
     }
     if (query.before) {
       const cursor = decodeProductCursor(query.before);
-      if (!cursor || cursor.sort !== query.sort || cursor.order !== query.order) {
+      if (!cursorMatchesQuery(cursor, query)) {
         return err(new InvalidProductCursorError());
       }
     }

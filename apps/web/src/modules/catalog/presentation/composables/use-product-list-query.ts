@@ -2,6 +2,7 @@ import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
   blankToUndefined,
+  PRODUCT_LIST_OFFSET_PAGE_MAX,
   type ListProductsQuery,
   type ProductOrder,
   type ProductSort,
@@ -24,6 +25,9 @@ export function useProductListQuery() {
   const router = useRouter();
 
   const query = computed(() => toListProductsQuery(route.query));
+  const cursorMode = computed(
+    () => Boolean(query.value.after || query.value.before),
+  );
 
   function replaceQuery(patch: QueryPatch) {
     const current = query.value;
@@ -82,21 +86,44 @@ export function useProductListQuery() {
   }
 
   function goToPage(page: number) {
+    const clamped = Math.min(
+      Math.max(1, page),
+      PRODUCT_LIST_OFFSET_PAGE_MAX,
+    );
     replaceQuery({
-      page: page > 1 ? String(page) : undefined,
+      page: clamped > 1 ? String(clamped) : undefined,
       after: undefined,
       before: undefined,
     });
   }
 
+  function goAfter(cursor: string) {
+    replaceQuery({
+      after: cursor,
+      before: undefined,
+      page: undefined,
+    });
+  }
+
+  function goBefore(cursor: string) {
+    replaceQuery({
+      before: cursor,
+      after: undefined,
+      page: undefined,
+    });
+  }
+
   return {
     query,
+    cursorMode,
     setSearch,
     setSort,
     setOrder,
     setListing,
     clearFilters,
     goToPage,
+    goAfter,
+    goBefore,
   };
 }
 

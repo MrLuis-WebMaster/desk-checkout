@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch, type Component } from "vue";
+import { computed, onScopeDispose, ref, watch, type Component } from "vue";
 import {
   ArrowDown01,
   ArrowDown10,
@@ -8,7 +8,11 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "@lucide/vue";
-import type { ProductOrder, ProductSort } from "@checkout/contracts";
+import {
+  PRODUCT_LIST_OFFSET_PAGE_MAX,
+  type ProductOrder,
+  type ProductSort,
+} from "@checkout/contracts";
 import { routeNames } from "@/app/router";
 import { useProductList } from "@/modules/catalog/presentation/composables/use-product-list";
 import { useProductListQuery } from "@/modules/catalog/presentation/composables/use-product-list-query";
@@ -78,12 +82,25 @@ const SORT_PRESETS: ReadonlyArray<{
 
 const DEFAULT_PRESET = SORT_PRESETS[0];
 
-const { query, setSearch, setListing, clearFilters, goToPage } =
-  useProductListQuery();
-const { items, total, loading, errorMessage } = useProductList(query);
+const {
+  query,
+  cursorMode,
+  setSearch,
+  setListing,
+  clearFilters,
+  goToPage,
+  goAfter,
+  goBefore,
+} = useProductListQuery();
+const { items, total, nextCursor, prevCursor, loading, errorMessage } =
+  useProductList(query);
 
 const searchInput = ref(query.value.q ?? "");
 let searchTimer = 0;
+
+onScopeDispose(() => {
+  window.clearTimeout(searchTimer);
+});
 
 const presetId = computed(() => {
   const match = SORT_PRESETS.find(
@@ -114,8 +131,32 @@ const resultLabel = computed(() =>
   total.value === 1 ? "1 product" : `${total.value} products`,
 );
 const currentPage = computed(() => query.value.page ?? 1);
-const pageCount = computed(() =>
-  total.value === 0 ? 0 : Math.ceil(total.value / query.value.pageSize),
+const pageCount = computed(() => {
+  if (total.value === 0) {
+    return 0;
+  }
+  return Math.min(
+    Math.ceil(total.value / query.value.pageSize),
+    PRODUCT_LIST_OFFSET_PAGE_MAX,
+  );
+});
+const showPagination = computed(
+  () =>
+    !loading.value &&
+    (pageCount.value > 1 ||
+      Boolean(nextCursor.value) ||
+      Boolean(prevCursor.value) ||
+      cursorMode.value),
+);
+const canGoPrev = computed(
+  () => Boolean(prevCursor.value) || (!cursorMode.value && currentPage.value > 1),
+);
+const canGoNext = computed(
+  () =>
+    Boolean(nextCursor.value) ||
+    (!cursorMode.value &&
+      pageCount.value > 0 &&
+      currentPage.value < pageCount.value),
 );
 const pageDraft = ref("1");
 
@@ -167,8 +208,12 @@ watch(
   { immediate: true },
 );
 
-watch([currentPage, pageCount], () => {
-  if (pageCount.value > 0 && currentPage.value > pageCount.value) {
+watch([currentPage, pageCount, cursorMode], () => {
+  if (
+    !cursorMode.value &&
+    pageCount.value > 0 &&
+    currentPage.value > pageCount.value
+  ) {
     goToPage(pageCount.value);
   }
 });
@@ -180,6 +225,26 @@ function jumpToDraft() {
     return;
   }
   goToPage(Math.min(next, pageCount.value));
+}
+
+function goPrev() {
+  if (prevCursor.value) {
+    goBefore(prevCursor.value);
+    return;
+  }
+  if (!cursorMode.value && currentPage.value > 1) {
+    goToPage(currentPage.value - 1);
+  }
+}
+
+function goNext() {
+  if (nextCursor.value) {
+    goAfter(nextCursor.value);
+    return;
+  }
+  if (!cursorMode.value && currentPage.value < pageCount.value) {
+    goToPage(currentPage.value + 1);
+  }
 }
 </script>
 
@@ -311,7 +376,7 @@ function jumpToDraft() {
     </div>
 
     <nav
-      v-if="!loading && pageCount > 1"
+      v-if="showPagination"
       class="mt-6 flex justify-center"
       aria-label="Pagination"
     >
@@ -322,14 +387,17 @@ function jumpToDraft() {
         <button
           type="button"
           class="inline-flex size-11 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
-          :disabled="currentPage <= 1"
+          :disabled="!canGoPrev"
           aria-label="Previous page"
-          @click="goToPage(currentPage - 1)"
+          @click="goPrev"
         >
           <UiIcon :icon="ChevronLeft" :size="18" />
         </button>
         <span class="w-px self-stretch bg-line" aria-hidden="true" />
-        <label class="flex items-center gap-2 px-3 text-sm">
+        <label
+          v-if="!cursorMode"
+          class="flex items-center gap-2 px-3 text-sm"
+        >
           <span class="text-muted">Page</span>
           <input
             v-model="pageDraft"
@@ -343,13 +411,19 @@ function jumpToDraft() {
           />
           <span class="text-muted">of {{ pageCount }}</span>
         </label>
+        <span
+          v-else
+          class="px-3 text-sm text-muted"
+        >
+          Browsing results
+        </span>
         <span class="w-px self-stretch bg-line" aria-hidden="true" />
         <button
           type="button"
           class="inline-flex size-11 items-center justify-center disabled:cursor-not-allowed disabled:opacity-40"
-          :disabled="currentPage >= pageCount"
+          :disabled="!canGoNext"
           aria-label="Next page"
-          @click="goToPage(currentPage + 1)"
+          @click="goNext"
         >
           <UiIcon :icon="ChevronRight" :size="18" />
         </button>

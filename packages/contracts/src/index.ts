@@ -39,6 +39,9 @@ export const PRODUCT_LIST_PAGE_SIZE = {
   default: 10,
 } as const;
 
+/** Max 1-based offset page accepted by the API (beyond this, use cursors). */
+export const PRODUCT_LIST_OFFSET_PAGE_MAX = 100;
+
 export type ProductSort = (typeof PRODUCT_SORTS)[number];
 export type ProductOrder = (typeof PRODUCT_ORDERS)[number];
 
@@ -84,7 +87,11 @@ export function parseProductOrder(
 
 export function parseProductListPage(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value);
-  if (Number.isInteger(n) && n >= 1 && n <= 100) {
+  if (
+    Number.isInteger(n) &&
+    n >= 1 &&
+    n <= PRODUCT_LIST_OFFSET_PAGE_MAX
+  ) {
     return n;
   }
   return 1;
