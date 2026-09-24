@@ -17,7 +17,12 @@ TypeScript monorepo for a product checkout: Vue 3 + Pinia on the frontend, NestJ
 
 ```bash
 pnpm install
+cp .env.example .env
+cp apps/web/.env.example apps/web/.env
+cp apps/worker/.env.example apps/worker/.env
 docker compose up -d
+pnpm db:migrate
+pnpm db:seed
 pnpm dev
 ```
 
@@ -27,4 +32,11 @@ pnpm dev
 | API | http://localhost:3000/health |
 | Worker | http://localhost:3001/health |
 
-PostgreSQL listens on `localhost:5432`. Database, user, and password are `checkout`.
+PostgreSQL listens on `localhost:5433` (container port 5432). Database, user, and password are `checkout`. Port 5433 avoids clashing with a local PostgreSQL on 5432.
+
+### Catalog API
+
+- `GET /products` — cursor-paginated list (`pageSize`, `q`, `sort`, `order`, `after`, `before`)
+- `GET /products/:id` — product detail with `availableStock`
+
+All JSON responses use `{ ok: true, data }` or `{ ok: false, error }`.
