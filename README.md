@@ -28,7 +28,3 @@ pnpm dev
 | Worker | http://localhost:3001/health |
 
 PostgreSQL listens on `localhost:5432`. Database, user, and password are `checkout`.
-
-## Architecture decisions
-
-- [ADR-003 Pinia over Vuex](docs/adr/003-pinia-over-vuex.md)
