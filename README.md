@@ -47,9 +47,12 @@ PostgreSQL listens on `localhost:5433` (container port 5432). Database, user, an
 - `GET /transactions/:id` — returns the transaction with pricing snapshots
 
 The base fee and shipping rates are stored in PostgreSQL and seeded
-idempotently. Creating a transaction snapshots the product name and price,
+idempotently. All money fields (`product.price`, quote `amount`, settings
+`baseFee`, and transaction snapshots) use the same integer COP units.
+Creating a transaction snapshots the product name and price,
 base fee, delivery fee, and calculated total. Phase 3 only checks current
 stock; reservation/decrement and the associated TOCTOU protection are deferred
 to the payment phase. Request idempotency is also deferred.
+Guest `GET /transactions/:id` is keyed by UUID only (no auth yet).
 
 All JSON responses use `{ ok: true, data }` or `{ ok: false, error }`.

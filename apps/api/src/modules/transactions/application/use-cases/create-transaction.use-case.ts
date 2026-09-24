@@ -61,7 +61,7 @@ export class CreateTransactionUseCase {
         ),
       );
     }
-    if (rate.amountCents === null) {
+    if (rate.amount === null) {
       return err(
         new ShippingRateNotFoundError(
           request.delivery.shippingMethodId,
@@ -75,7 +75,7 @@ export class CreateTransactionUseCase {
       productName: product.name,
       productPrice: Money.create(product.price),
       baseFee: Money.create(baseFee),
-      deliveryFee: Money.create(rate.amountCents),
+      deliveryFee: Money.create(rate.amount),
       customer: request.customer,
       delivery: request.delivery,
     });

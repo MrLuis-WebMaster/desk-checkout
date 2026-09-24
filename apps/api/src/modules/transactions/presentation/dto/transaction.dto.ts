@@ -1,4 +1,4 @@
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   IsEmail,
   IsIn,
@@ -17,18 +17,25 @@ import {
   type TransactionDto,
 } from "@checkout/contracts";
 
+function trimString({ value }: { value: unknown }): unknown {
+  return typeof value === "string" ? value.trim() : value;
+}
+
 export class CreateTransactionCustomerDto {
   @ApiProperty()
+  @Transform(trimString)
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
   fullName!: string;
 
   @ApiProperty()
+  @Transform(trimString)
   @IsEmail()
   email!: string;
 
   @ApiProperty()
+  @Transform(trimString)
   @IsString()
   @IsNotEmpty()
   @MaxLength(30)
@@ -41,12 +48,14 @@ export class CreateTransactionDeliveryDto {
   shippingMethodId!: string;
 
   @ApiProperty()
+  @Transform(trimString)
   @IsString()
   @IsNotEmpty()
   @MaxLength(300)
   addressLine!: string;
 
   @ApiProperty()
+  @Transform(trimString)
   @IsString()
   @IsNotEmpty()
   @MaxLength(120)
@@ -57,6 +66,7 @@ export class CreateTransactionDeliveryDto {
   regionCode!: ShippingRegionCode;
 
   @ApiProperty()
+  @Transform(trimString)
   @IsString()
   @IsNotEmpty()
   @MaxLength(20)
@@ -98,16 +108,24 @@ export class TransactionResponseDto implements TransactionDto {
   @ApiProperty()
   productName!: string;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: "Snapshot product price in integer COP units",
+  })
   productPrice!: number;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: "Snapshot base fee in integer COP units",
+  })
   baseFee!: number;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: "Snapshot delivery fee in integer COP units",
+  })
   deliveryFee!: number;
 
-  @ApiProperty()
+  @ApiProperty({
+    description: "Snapshot total in integer COP units",
+  })
   total!: number;
 
   @ApiProperty({ type: CreateTransactionCustomerDto })

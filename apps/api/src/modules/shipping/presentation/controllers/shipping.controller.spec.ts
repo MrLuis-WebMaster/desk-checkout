@@ -25,7 +25,7 @@ describe("ShippingController", () => {
 
   it("returns regional shipping quotes", async () => {
     const quotes = [
-      { id: "method", code: "standard", name: "Standard", amountCents: 8000 },
+      { id: "method", code: "standard", name: "Standard", amount: 8000 },
     ];
     listShippingQuotes.execute.mockResolvedValue(ok(quotes));
     await expect(controller.list({ region: "BOG" })).resolves.toEqual(quotes);

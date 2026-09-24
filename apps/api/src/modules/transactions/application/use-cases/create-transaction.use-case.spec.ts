@@ -49,7 +49,7 @@ describe("CreateTransactionUseCase", () => {
     feeCatalog.getBaseFee.mockResolvedValue(5000);
     feeCatalog.getRate.mockResolvedValue({
       methodFound: true,
-      amountCents: 8000,
+      amount: 8000,
     });
     transactionWriter.save.mockImplementation(async (transaction) => ({
       id: transaction.id,
@@ -70,7 +70,7 @@ describe("CreateTransactionUseCase", () => {
     feeCatalog.getBaseFee.mockResolvedValue(7300);
     feeCatalog.getRate.mockResolvedValue({
       methodFound: true,
-      amountCents: 9100,
+      amount: 9100,
     });
 
     const result = await useCase.execute(request);
@@ -122,7 +122,7 @@ describe("CreateTransactionUseCase", () => {
   it("returns ShippingMethodNotFound for an absent or inactive method", async () => {
     feeCatalog.getRate.mockResolvedValue({
       methodFound: false,
-      amountCents: null,
+      amount: null,
     });
     const result = await useCase.execute(request);
     expect(result).toMatchObject({
@@ -134,7 +134,7 @@ describe("CreateTransactionUseCase", () => {
   it("returns ShippingRateNotFound when the region rate is absent", async () => {
     feeCatalog.getRate.mockResolvedValue({
       methodFound: true,
-      amountCents: null,
+      amount: null,
     });
     const result = await useCase.execute(request);
     expect(result).toMatchObject({

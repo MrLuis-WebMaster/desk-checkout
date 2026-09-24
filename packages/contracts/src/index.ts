@@ -153,15 +153,17 @@ export const SHIPPING_REGION_CODES = ["BOG", "MED", "CALI", "OTHER"] as const;
 
 export type ShippingRegionCode = (typeof SHIPPING_REGION_CODES)[number];
 
+/** Quote amount in the same integer COP units as `ProductDto.price`. */
 export type ShippingMethodQuoteDto = {
   id: string;
   code: string;
   name: string;
-  amountCents: number;
+  amount: number;
 };
 
+/** Base fee in the same integer COP units as `ProductDto.price`. */
 export type CheckoutSettingsDto = {
-  baseFeeCents: number;
+  baseFee: number;
 };
 
 export type TransactionCustomerDto = {

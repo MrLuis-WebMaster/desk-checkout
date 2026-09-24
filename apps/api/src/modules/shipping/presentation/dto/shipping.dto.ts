@@ -25,11 +25,15 @@ export class ShippingMethodQuoteResponseDto
   @ApiProperty()
   name!: string;
 
-  @ApiProperty()
-  amountCents!: number;
+  @ApiProperty({
+    description: "Fee in the same integer COP units as product.price",
+  })
+  amount!: number;
 }
 
 export class CheckoutSettingsResponseDto implements CheckoutSettingsDto {
-  @ApiProperty()
-  baseFeeCents!: number;
+  @ApiProperty({
+    description: "Base fee in the same integer COP units as product.price",
+  })
+  baseFee!: number;
 }

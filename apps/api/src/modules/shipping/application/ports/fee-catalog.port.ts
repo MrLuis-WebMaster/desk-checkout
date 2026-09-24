@@ -5,7 +5,7 @@ import type {
 
 export type ShippingRateLookup = {
   methodFound: boolean;
-  amountCents: number | null;
+  amount: number | null;
 };
 
 export abstract class FeeCatalog {

@@ -15,6 +15,7 @@ import {
 import { ApiErrorCode } from "@checkout/contracts";
 import {
   ApiFailureDto,
+  apiSuccessArraySchema,
   apiSuccessSchema,
 } from "#shared/presentation/swagger/api-envelope.js";
 import { GetCheckoutSettingsUseCase } from "../../application/use-cases/get-checkout-settings.use-case.js";
@@ -40,7 +41,9 @@ export class ShippingController {
 
   @Get("shipping-methods")
   @ApiOperation({ summary: "Listar métodos y tarifas de envío por región" })
-  @ApiOkResponse({ type: [ShippingMethodQuoteResponseDto] })
+  @ApiOkResponse({
+    schema: apiSuccessArraySchema(ShippingMethodQuoteResponseDto),
+  })
   async list(@Query() query: ShippingRegionQueryDto) {
     const result = await this.listShippingQuotes.execute(query.region);
     if (!result.ok) {

@@ -15,7 +15,7 @@ describe("shipping use cases", () => {
 
   it("lists quotes returned by the fee catalog", async () => {
     const quotes = [
-      { id: "method-1", code: "standard", name: "Standard", amountCents: 8000 },
+      { id: "method-1", code: "standard", name: "Standard", amount: 8000 },
     ];
     feeCatalog.listQuotes.mockResolvedValue(quotes);
     const useCase = new ListShippingQuotesUseCase(
@@ -34,7 +34,7 @@ describe("shipping use cases", () => {
     );
     await expect(useCase.execute()).resolves.toEqual({
       ok: true,
-      value: { baseFeeCents: 5000 },
+      value: { baseFee: 5000 },
     });
   });
 

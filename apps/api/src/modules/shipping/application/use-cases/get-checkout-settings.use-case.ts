@@ -11,10 +11,10 @@ export class GetCheckoutSettingsUseCase {
   async execute(): Promise<
     Result<CheckoutSettingsDto, CheckoutSettingsNotFoundError>
   > {
-    const baseFeeCents = await this.feeCatalog.getBaseFee();
-    if (baseFeeCents === null) {
+    const baseFee = await this.feeCatalog.getBaseFee();
+    if (baseFee === null) {
       return err(new CheckoutSettingsNotFoundError());
     }
-    return ok({ baseFeeCents });
+    return ok({ baseFee });
   }
 }

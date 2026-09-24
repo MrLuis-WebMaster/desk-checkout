@@ -12,6 +12,7 @@ import {
   ApiCreatedResponse,
   ApiExtraModels,
   ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiServiceUnavailableResponse,
   ApiTags,
@@ -59,6 +60,7 @@ export class TransactionsController {
 
   @Get(":id")
   @ApiOperation({ summary: "Obtener una transacción" })
+  @ApiOkResponse({ schema: apiSuccessSchema(TransactionResponseDto) })
   @ApiNotFoundResponse({ type: ApiFailureDto })
   async show(@Param() params: TransactionParamsDto) {
     const result = await this.getTransaction.execute(params.id);

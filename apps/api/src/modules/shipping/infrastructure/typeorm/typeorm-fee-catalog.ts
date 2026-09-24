@@ -39,12 +39,12 @@ export class TypeOrmFeeCatalog extends FeeCatalog {
       where: { id: methodId, active: true },
     });
     if (!method) {
-      return { methodFound: false, amountCents: null };
+      return { methodFound: false, amount: null };
     }
     const rate = await this.rates.findOne({
       where: { shippingMethodId: methodId, regionCode },
     });
-    return { methodFound: true, amountCents: rate?.amountCents ?? null };
+    return { methodFound: true, amount: rate?.amountCents ?? null };
   }
 
   async listQuotes(
@@ -62,7 +62,7 @@ export class TypeOrmFeeCatalog extends FeeCatalog {
         "method.id AS id",
         "method.code AS code",
         "method.name AS name",
-        "rate.amount_cents AS \"amountCents\"",
+        "rate.amount_cents AS \"amount\"",
       ])
       .where("method.active = true")
       .orderBy("rate.amount_cents", "ASC")
@@ -70,14 +70,14 @@ export class TypeOrmFeeCatalog extends FeeCatalog {
         id: string;
         code: string;
         name: string;
-        amountCents: string | number;
+        amount: string | number;
       }>();
 
     return rows.map((row) => ({
       id: row.id,
       code: row.code,
       name: row.name,
-      amountCents: Number(row.amountCents),
+      amount: Number(row.amount),
     }));
   }
 }
