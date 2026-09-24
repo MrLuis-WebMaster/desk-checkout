@@ -1,7 +1,17 @@
 import { Module } from "@nestjs/common";
-import { HealthModule } from "./health/health.module.js";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { HealthModule } from "#modules/health/presentation/health.module.js";
+import { buildDataSourceOptions } from "#shared/infrastructure/persistence/typeorm.data-source.js";
+import { CatalogModule } from "#modules/catalog/presentation/catalog.module.js";
 
 @Module({
-  imports: [HealthModule],
+  imports: [
+    TypeOrmModule.forRoot({
+      ...buildDataSourceOptions(),
+      autoLoadEntities: true,
+    }),
+    HealthModule,
+    CatalogModule,
+  ],
 })
 export class AppModule {}
