@@ -1,5 +1,6 @@
 import { Transform, Type } from "class-transformer";
 import {
+  IsDefined,
   IsEmail,
   IsIn,
   IsNotEmpty,
@@ -79,11 +80,13 @@ export class CreateTransactionDto implements CreateTransactionRequest {
   productId!: string;
 
   @ApiProperty({ type: CreateTransactionCustomerDto })
+  @IsDefined()
   @ValidateNested()
   @Type(() => CreateTransactionCustomerDto)
   customer!: CreateTransactionCustomerDto;
 
   @ApiProperty({ type: CreateTransactionDeliveryDto })
+  @IsDefined()
   @ValidateNested()
   @Type(() => CreateTransactionDeliveryDto)
   delivery!: CreateTransactionDeliveryDto;
