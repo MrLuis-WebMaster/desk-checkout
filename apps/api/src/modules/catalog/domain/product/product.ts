@@ -1,4 +1,4 @@
-import { Money } from "./money.js";
+import { Money } from "#shared/domain/money.js";
 
 export class Product {
   private constructor(

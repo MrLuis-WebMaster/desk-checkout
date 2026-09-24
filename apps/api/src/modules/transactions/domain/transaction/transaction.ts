@@ -3,7 +3,7 @@ import {
   TransactionStatus,
   type ShippingRegionCode,
 } from "@checkout/contracts";
-import { Money } from "./money.js";
+import { Money } from "#shared/domain/money.js";
 
 export type TransactionCustomer = {
   fullName: string;

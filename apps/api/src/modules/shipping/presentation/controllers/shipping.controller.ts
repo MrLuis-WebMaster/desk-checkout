@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  HttpException,
   HttpStatus,
   Query,
 } from "@nestjs/common";
@@ -13,6 +12,7 @@ import {
   ApiTags,
 } from "@nestjs/swagger";
 import { ApiErrorCode } from "@checkout/contracts";
+import { throwApiError } from "#shared/presentation/http/throw-api-error.js";
 import {
   ApiFailureDto,
   apiSuccessArraySchema,
@@ -47,11 +47,9 @@ export class ShippingController {
   async list(@Query() query: ShippingRegionQueryDto) {
     const result = await this.listShippingQuotes.execute(query.region);
     if (!result.ok) {
-      throw new HttpException(
-        {
-          code: ApiErrorCode.Unexpected,
-          message: "Unable to list shipping quotes",
-        },
+      throwApiError(
+        ApiErrorCode.Unexpected,
+        "Unable to list shipping quotes",
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
@@ -65,11 +63,9 @@ export class ShippingController {
   async settings() {
     const result = await this.getCheckoutSettings.execute();
     if (!result.ok) {
-      throw new HttpException(
-        {
-          code: ApiErrorCode.CheckoutSettingsNotFound,
-          message: "Checkout settings are unavailable",
-        },
+      throwApiError(
+        ApiErrorCode.CheckoutSettingsNotFound,
+        "Checkout settings are unavailable",
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }

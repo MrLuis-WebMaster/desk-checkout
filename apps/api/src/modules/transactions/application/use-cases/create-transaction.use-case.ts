@@ -14,7 +14,7 @@ import {
   OutOfStockError,
   ProductNotFoundError,
 } from "../../domain/transaction/errors.js";
-import { Money } from "../../domain/transaction/money.js";
+import { Money } from "#shared/domain/money.js";
 import { Transaction } from "../../domain/transaction/transaction.js";
 import { ProductStockReader } from "../ports/product-stock-reader.port.js";
 import { TransactionWriter } from "../ports/transaction-writer.port.js";

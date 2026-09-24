@@ -2,7 +2,6 @@ import {
   Body,
   Controller,
   Get,
-  HttpException,
   HttpStatus,
   Param,
   Post,
@@ -19,6 +18,7 @@ import {
   ApiUnprocessableEntityResponse,
 } from "@nestjs/swagger";
 import { ApiErrorCode } from "@checkout/contracts";
+import { throwApiError } from "#shared/presentation/http/throw-api-error.js";
 import {
   ApiFailureDto,
   apiSuccessSchema,
@@ -65,11 +65,9 @@ export class TransactionsController {
   async show(@Param() params: TransactionParamsDto) {
     const result = await this.getTransaction.execute(params.id);
     if (!result.ok) {
-      throw new HttpException(
-        {
-          code: ApiErrorCode.TransactionNotFound,
-          message: "Transaction not found",
-        },
+      throwApiError(
+        ApiErrorCode.TransactionNotFound,
+        "Transaction not found",
         HttpStatus.NOT_FOUND,
       );
     }
@@ -111,8 +109,5 @@ function throwTransactionError(code: string): never {
     message: "Unexpected transaction error",
     status: HttpStatus.INTERNAL_SERVER_ERROR,
   };
-  throw new HttpException(
-    { code: mapped.code, message: mapped.message },
-    mapped.status,
-  );
+  throwApiError(mapped.code, mapped.message, mapped.status);
 }
