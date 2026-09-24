@@ -41,7 +41,7 @@ export const PRODUCT_ORDERS = ["asc", "desc"] as const;
 export const PRODUCT_LIST_PAGE_SIZE = {
   min: 1,
   max: 50,
-  default: 10,
+  default: 12,
 } as const;
 
 /** Max 1-based offset page accepted by the API (beyond this, use cursors). */
