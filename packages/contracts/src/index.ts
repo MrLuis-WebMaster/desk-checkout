@@ -8,6 +8,11 @@ export enum TransactionStatus {
 export const ApiErrorCode = {
   ValidationError: "VALIDATION_ERROR",
   ProductNotFound: "PRODUCT_NOT_FOUND",
+  OutOfStock: "OUT_OF_STOCK",
+  ShippingRateNotFound: "SHIPPING_RATE_NOT_FOUND",
+  ShippingMethodNotFound: "SHIPPING_METHOD_NOT_FOUND",
+  CheckoutSettingsNotFound: "CHECKOUT_SETTINGS_NOT_FOUND",
+  TransactionNotFound: "TRANSACTION_NOT_FOUND",
   RouteNotFound: "ROUTE_NOT_FOUND",
   Unexpected: "UNEXPECTED",
 } as const;
@@ -142,6 +147,55 @@ export type ProductPageDto = {
   total: number;
   nextCursor: string | null;
   prevCursor: string | null;
+};
+
+export const SHIPPING_REGION_CODES = ["BOG", "MED", "CALI", "OTHER"] as const;
+
+export type ShippingRegionCode = (typeof SHIPPING_REGION_CODES)[number];
+
+export type ShippingMethodQuoteDto = {
+  id: string;
+  code: string;
+  name: string;
+  amountCents: number;
+};
+
+export type CheckoutSettingsDto = {
+  baseFeeCents: number;
+};
+
+export type TransactionCustomerDto = {
+  fullName: string;
+  email: string;
+  phone: string;
+};
+
+export type TransactionDeliveryDto = {
+  shippingMethodId: string;
+  addressLine: string;
+  city: string;
+  regionCode: ShippingRegionCode;
+  postalCode: string;
+};
+
+export type CreateTransactionRequest = {
+  productId: string;
+  customer: TransactionCustomerDto;
+  delivery: TransactionDeliveryDto;
+};
+
+export type TransactionDto = {
+  id: string;
+  status: TransactionStatus;
+  productId: string;
+  productName: string;
+  productPrice: number;
+  baseFee: number;
+  deliveryFee: number;
+  total: number;
+  customer: TransactionCustomerDto;
+  delivery: TransactionDeliveryDto;
+  createdAt: string;
 };
 
 export type HealthDto = {
