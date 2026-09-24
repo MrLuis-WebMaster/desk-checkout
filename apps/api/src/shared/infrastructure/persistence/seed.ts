@@ -2,6 +2,10 @@ import "reflect-metadata";
 import { AppDataSource } from "./typeorm.data-source.js";
 import { InventoryOrmEntity } from "#modules/inventory/infrastructure/typeorm/inventory.orm-entity.js";
 import { ProductOrmEntity } from "#modules/catalog/infrastructure/typeorm/product.orm-entity.js";
+import { CheckoutSettingOrmEntity } from "#modules/shipping/infrastructure/typeorm/checkout-setting.orm-entity.js";
+import { ShippingMethodOrmEntity } from "#modules/shipping/infrastructure/typeorm/shipping-method.orm-entity.js";
+import { ShippingRateOrmEntity } from "#modules/shipping/infrastructure/typeorm/shipping-rate.orm-entity.js";
+import type { ShippingRegionCode } from "@checkout/contracts";
 
 type SeedProduct = {
   name: string;
@@ -10,6 +14,25 @@ type SeedProduct = {
   imageUrl: string;
   available: number;
 };
+
+type SeedShippingMethod = {
+  code: string;
+  name: string;
+  rates: Record<ShippingRegionCode, number>;
+};
+
+const SEED_SHIPPING_METHODS: SeedShippingMethod[] = [
+  {
+    code: "standard",
+    name: "Standard",
+    rates: { BOG: 8000, MED: 12000, CALI: 12000, OTHER: 18000 },
+  },
+  {
+    code: "express",
+    name: "Express",
+    rates: { BOG: 15000, MED: 20000, CALI: 20000, OTHER: 28000 },
+  },
+];
 
 const SEED_PRODUCTS: SeedProduct[] = [
   {
@@ -854,9 +877,60 @@ async function seed(): Promise<void> {
 
         await manager.save(inventory);
       }
+
+      let baseFee = await manager.findOne(CheckoutSettingOrmEntity, {
+        where: { key: "base_fee" },
+      });
+      if (!baseFee) {
+        baseFee = manager.create(CheckoutSettingOrmEntity, {
+          key: "base_fee",
+          valueCents: 5000,
+        });
+      } else {
+        baseFee.valueCents = 5000;
+      }
+      await manager.save(baseFee);
+
+      for (const item of SEED_SHIPPING_METHODS) {
+        let method = await manager.findOne(ShippingMethodOrmEntity, {
+          where: { code: item.code },
+        });
+        if (!method) {
+          method = manager.create(ShippingMethodOrmEntity, {
+            code: item.code,
+            name: item.name,
+            active: true,
+          });
+        } else {
+          method.name = item.name;
+          method.active = true;
+        }
+        method = await manager.save(method);
+
+        for (const [regionCode, amountCents] of Object.entries(item.rates)) {
+          let rate = await manager.findOne(ShippingRateOrmEntity, {
+            where: {
+              shippingMethodId: method.id,
+              regionCode: regionCode as ShippingRegionCode,
+            },
+          });
+          if (!rate) {
+            rate = manager.create(ShippingRateOrmEntity, {
+              shippingMethodId: method.id,
+              regionCode: regionCode as ShippingRegionCode,
+              amountCents,
+            });
+          } else {
+            rate.amountCents = amountCents;
+          }
+          await manager.save(rate);
+        }
+      }
     });
 
-    console.log(`Seeded ${SEED_PRODUCTS.length} products`);
+    console.log(
+      `Seeded ${SEED_PRODUCTS.length} products and ${SEED_SHIPPING_METHODS.length} shipping methods`,
+    );
   } finally {
     await AppDataSource.destroy();
   }
