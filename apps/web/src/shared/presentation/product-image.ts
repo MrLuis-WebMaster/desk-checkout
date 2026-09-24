@@ -1,9 +1,8 @@
 /**
- * Product image URL as stored (SVG placeholders under `public/products`).
- * After `scripts/fetch-mock-photos.mjs`, prefer JPGs in seed data.
+ * Prefer the JPG mock photo. The database may still store the SVG placeholder.
  */
 export function productImageSrc(imageUrl: string): string {
-  return imageUrl;
+  return imageUrl.replace(/\.svg$/i, ".jpg");
 }
 
 /** Fallback when a legacy/missing JPG still points at a placeholder SVG. */
