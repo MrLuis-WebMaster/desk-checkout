@@ -4,7 +4,9 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 export function setupSwagger(app: INestApplication): void {
   const config = new DocumentBuilder()
     .setTitle("Checkout API")
-    .setDescription("Catálogo de productos y salud del checkout.")
+    .setDescription(
+      "Catálogo, tarifas de envío y transacciones guest del checkout.",
+    )
     .setVersion("1.0")
     .build();
 
