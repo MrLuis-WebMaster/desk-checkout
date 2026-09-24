@@ -1,4 +1,4 @@
-import { copyFile, mkdir, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -155,5 +155,6 @@ for (const [family, slugs] of Object.entries(groups)) {
   for (const slug of slugs) {
     await copyFile(source, path.join(root, `${slug}.jpg`));
   }
+  await unlink(source);
   console.log(`${family}: ${slugs.length}`);
 }

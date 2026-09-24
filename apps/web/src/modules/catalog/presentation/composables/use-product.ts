@@ -5,20 +5,22 @@ import { routeNames } from "@/app/router";
 import { getProduct } from "@/modules/catalog/composition/index";
 import { screenMessage } from "@/modules/catalog/application/results/screen-result";
 import { toProductIdParam } from "@/modules/catalog/presentation/mappers/catalog-route.mapper";
+import { createAbortScope } from "@/modules/catalog/presentation/composables/abort-scope";
 
-export function useProduct() {
-  const route = useRoute(routeNames.product);
+export function useProduct(
+  routeName: typeof routeNames.product | typeof routeNames.checkout = routeNames.product,
+  onProductId?: (productId: string) => void,
+) {
+  const route = useRoute(routeName);
   const product = ref<ProductDto | null>(null);
   const loading = ref(false);
   const errorMessage = ref("");
-  let loadAbort: AbortController | null = null;
+  const abortScope = createAbortScope();
 
   watch(
     () => route.params.id,
     async (rawId) => {
-      loadAbort?.abort();
-      const controller = new AbortController();
-      loadAbort = controller;
+      const controller = abortScope.start();
 
       const productId = toProductIdParam(rawId);
       loading.value = true;
@@ -30,6 +32,8 @@ export function useProduct() {
         errorMessage.value = screenMessage({ status: "not_found" });
         return;
       }
+
+      onProductId?.(productId);
 
       const result = await getProduct(productId, controller.signal);
       if (controller.signal.aborted || result.status === "aborted") {
@@ -48,7 +52,7 @@ export function useProduct() {
   );
 
   onScopeDispose(() => {
-    loadAbort?.abort();
+    abortScope.dispose();
   });
 
   return {

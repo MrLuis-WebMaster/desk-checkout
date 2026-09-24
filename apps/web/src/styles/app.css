@@ -38,6 +38,35 @@
     outline-offset: 2px;
   }
 
+  @keyframes add-pop {
+    0% {
+      transform: scale(1);
+    }
+    40% {
+      transform: scale(0.86);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+
+  .animate-add-pop {
+    animation: add-pop 280ms var(--ease-out-quart);
+  }
+
+  @keyframes sheet-in {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+
+  .animate-sheet-in {
+    animation: sheet-in 220ms var(--ease-out-quart);
+  }
+
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

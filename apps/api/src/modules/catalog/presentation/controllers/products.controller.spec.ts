@@ -82,7 +82,7 @@ describe("ListProductsQueryDto", () => {
     const dto = plainToInstance(ListProductsQueryDto, {});
     const errors = await validate(dto);
     expect(errors).toHaveLength(0);
-    expect(dto.pageSize).toBe(10);
+    expect(dto.pageSize).toBe(12);
     expect(dto.sort).toBe("name");
     expect(dto.order).toBe("asc");
   });

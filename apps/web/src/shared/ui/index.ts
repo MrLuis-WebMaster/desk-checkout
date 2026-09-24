@@ -8,5 +8,6 @@ export { default as UiIcon } from "./UiIcon.vue";
 export { default as UiIconButton } from "./UiIconButton.vue";
 export { default as UiInput } from "./UiInput.vue";
 export { default as UiPrice } from "./UiPrice.vue";
+export { default as UiProductImage } from "./UiProductImage.vue";
 export { default as UiSelect } from "./UiSelect.vue";
 export { default as UiSkeleton } from "./UiSkeleton.vue";

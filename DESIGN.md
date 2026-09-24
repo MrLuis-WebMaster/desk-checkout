@@ -1,5 +1,5 @@
 ---
-name: Checkout
+name: Ecommerce
 description: Calm mobile catalog and checkout for desk gear priced in COP.
 colors:
   paper: "oklch(0.985 0.006 75)"
@@ -77,7 +77,7 @@ Flat. Separation is a 1px `line` border or a `sunken` fill. No drop shadows, no 
 
 ## Components
 
-Primitives: `AppShell`, `UiButton`, `UiIconButton`, `UiIcon`, `UiField`, `UiInput`, `UiSelect`, `UiAlert`, `UiPrice`, `UiSkeleton`, `UiEmpty`.
+Primitives: `AppShell`, `UiButton`, `UiIconButton`, `UiIcon`, `UiField`, `UiInput`, `UiSelect`, `UiAlert`, `UiPrice`, `UiProductImage`, `UiFilterLozenge`, `UiSkeleton`, `UiEmpty`.
 
 Buttons are 44px tall, radius `control`, 200ms color transitions on an exponential ease. Primary, secondary, and ghost share that shape. Disabled drops to 50% opacity. Loading sets `aria-busy`.
 

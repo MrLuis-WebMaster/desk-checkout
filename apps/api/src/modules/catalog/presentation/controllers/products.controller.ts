@@ -1,7 +1,6 @@
 import {
   Controller,
   Get,
-  HttpException,
   HttpStatus,
   Param,
   Query,
@@ -25,6 +24,7 @@ import {
   ProductPageResponseDto,
   ProductResponseDto,
 } from "../dto/product.response.dto.js";
+import { throwApiError } from "#shared/presentation/http/throw-api-error.js";
 import {
   ApiFailureDto,
   apiSuccessSchema,
@@ -46,12 +46,9 @@ export class ProductsController {
   async list(@Query() query: ListProductsQueryDto) {
     const result = await this.listProducts.execute(toListProductsQuery(query));
     if (!result.ok) {
-      throw new HttpException(
-        {
-          code: ApiErrorCode.ValidationError,
-          message:
-            "Invalid list query: use either page or after/before, not both",
-        },
+      throwApiError(
+        ApiErrorCode.ValidationError,
+        "Invalid list query: use either page or after/before, not both",
         HttpStatus.BAD_REQUEST,
       );
     }
@@ -65,11 +62,9 @@ export class ProductsController {
   async show(@Param() params: ProductParamsDto) {
     const result = await this.getProduct.execute(toProductId(params));
     if (!result.ok) {
-      throw new HttpException(
-        {
-          code: ApiErrorCode.ProductNotFound,
-          message: "Product not found",
-        },
+      throwApiError(
+        ApiErrorCode.ProductNotFound,
+        "Product not found",
         HttpStatus.NOT_FOUND,
       );
     }

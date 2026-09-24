@@ -29,3 +29,19 @@ export function apiSuccessSchema(model: new (...args: never[]) => object) {
     },
   };
 }
+
+export function apiSuccessArraySchema(
+  model: new (...args: never[]) => object,
+) {
+  return {
+    type: "object",
+    required: ["ok", "data"],
+    properties: {
+      ok: { type: "boolean", enum: [true], example: true },
+      data: {
+        type: "array",
+        items: { $ref: getSchemaPath(model) },
+      },
+    },
+  };
+}

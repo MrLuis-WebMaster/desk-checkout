@@ -8,6 +8,11 @@ export enum TransactionStatus {
 export const ApiErrorCode = {
   ValidationError: "VALIDATION_ERROR",
   ProductNotFound: "PRODUCT_NOT_FOUND",
+  OutOfStock: "OUT_OF_STOCK",
+  ShippingRateNotFound: "SHIPPING_RATE_NOT_FOUND",
+  ShippingMethodNotFound: "SHIPPING_METHOD_NOT_FOUND",
+  CheckoutSettingsNotFound: "CHECKOUT_SETTINGS_NOT_FOUND",
+  TransactionNotFound: "TRANSACTION_NOT_FOUND",
   RouteNotFound: "ROUTE_NOT_FOUND",
   Unexpected: "UNEXPECTED",
 } as const;
@@ -36,7 +41,7 @@ export const PRODUCT_ORDERS = ["asc", "desc"] as const;
 export const PRODUCT_LIST_PAGE_SIZE = {
   min: 1,
   max: 50,
-  default: 10,
+  default: 12,
 } as const;
 
 /** Max 1-based offset page accepted by the API (beyond this, use cursors). */
@@ -142,6 +147,57 @@ export type ProductPageDto = {
   total: number;
   nextCursor: string | null;
   prevCursor: string | null;
+};
+
+export const SHIPPING_REGION_CODES = ["BOG", "MED", "CALI", "OTHER"] as const;
+
+export type ShippingRegionCode = (typeof SHIPPING_REGION_CODES)[number];
+
+/** Quote amount in the same integer COP units as `ProductDto.price`. */
+export type ShippingMethodQuoteDto = {
+  id: string;
+  code: string;
+  name: string;
+  amount: number;
+};
+
+/** Base fee in the same integer COP units as `ProductDto.price`. */
+export type CheckoutSettingsDto = {
+  baseFee: number;
+};
+
+export type TransactionCustomerDto = {
+  fullName: string;
+  email: string;
+  phone: string;
+};
+
+export type TransactionDeliveryDto = {
+  shippingMethodId: string;
+  addressLine: string;
+  city: string;
+  regionCode: ShippingRegionCode;
+  postalCode: string;
+};
+
+export type CreateTransactionRequest = {
+  productId: string;
+  customer: TransactionCustomerDto;
+  delivery: TransactionDeliveryDto;
+};
+
+export type TransactionDto = {
+  id: string;
+  status: TransactionStatus;
+  productId: string;
+  productName: string;
+  productPrice: number;
+  baseFee: number;
+  deliveryFee: number;
+  total: number;
+  customer: TransactionCustomerDto;
+  delivery: TransactionDeliveryDto;
+  createdAt: string;
 };
 
 export type HealthDto = {
