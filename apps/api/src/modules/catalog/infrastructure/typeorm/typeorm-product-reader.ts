@@ -18,6 +18,10 @@ import {
   type ListProductsQuery,
 } from "../../application/ports/product-reader.port.js";
 import { ProductOrmEntity } from "./product.orm-entity.js";
+import {
+  AVAILABLE_STOCK_COLUMN,
+  joinAvailableStock,
+} from "./product-stock.query.js";
 
 const LIKE_ESCAPE = "\\";
 
@@ -57,20 +61,15 @@ export class TypeOrmProductReader extends ProductReader {
     const countQb = this.products.createQueryBuilder("product");
     this.applyNameFilter(countQb, query.q);
 
-    const pageQb = this.products
-      .createQueryBuilder("product")
-      .leftJoin(
-        "inventory",
-        "inventory",
-        "inventory.product_id = product.id",
-      )
-      .select([
-        "product.id AS id",
-        "product.name AS name",
-        "product.price AS price",
-        "product.image_url AS \"imageUrl\"",
-        "COALESCE(inventory.available, 0) AS \"availableStock\"",
-      ]);
+    const pageQb = joinAvailableStock(
+      this.products.createQueryBuilder("product"),
+    ).select([
+      "product.id AS id",
+      "product.name AS name",
+      "product.price AS price",
+      "product.image_url AS \"imageUrl\"",
+      AVAILABLE_STOCK_COLUMN,
+    ]);
 
     this.applyNameFilter(pageQb, query.q);
 
@@ -122,20 +121,16 @@ export class TypeOrmProductReader extends ProductReader {
   }
 
   async findById(id: string): Promise<ProductDto | null> {
-    const row = await this.products
-      .createQueryBuilder("product")
-      .leftJoin(
-        "inventory",
-        "inventory",
-        "inventory.product_id = product.id",
-      )
+    const row = await joinAvailableStock(
+      this.products.createQueryBuilder("product"),
+    )
       .select([
         "product.id AS id",
         "product.name AS name",
         "product.description AS description",
         "product.price AS price",
         "product.image_url AS \"imageUrl\"",
-        "COALESCE(inventory.available, 0) AS \"availableStock\"",
+        AVAILABLE_STOCK_COLUMN,
       ])
       .where("product.id = :id", { id })
       .getRawOne<{

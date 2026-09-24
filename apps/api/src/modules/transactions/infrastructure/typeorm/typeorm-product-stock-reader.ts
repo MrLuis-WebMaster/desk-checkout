@@ -3,6 +3,10 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { ProductOrmEntity } from "#modules/catalog/infrastructure/typeorm/product.orm-entity.js";
 import {
+  AVAILABLE_STOCK_COLUMN,
+  joinAvailableStock,
+} from "#modules/catalog/infrastructure/typeorm/product-stock.query.js";
+import {
   ProductStockReader,
   type ProductStock,
 } from "../../application/ports/product-stock-reader.port.js";
@@ -17,18 +21,14 @@ export class TypeOrmProductStockReader extends ProductStockReader {
   }
 
   async findById(id: string): Promise<ProductStock | null> {
-    const row = await this.products
-      .createQueryBuilder("product")
-      .leftJoin(
-        "inventory",
-        "inventory",
-        "inventory.product_id = product.id",
-      )
+    const row = await joinAvailableStock(
+      this.products.createQueryBuilder("product"),
+    )
       .select([
         "product.id AS id",
         "product.name AS name",
         "product.price AS price",
-        "COALESCE(inventory.available, 0) AS \"availableStock\"",
+        AVAILABLE_STOCK_COLUMN,
       ])
       .where("product.id = :id", { id })
       .getRawOne<{
