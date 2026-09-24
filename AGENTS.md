@@ -13,3 +13,7 @@ El arranque completo está en `README.md`:
 5. `pnpm dev`
 
 Vuelve a correr `pnpm db:migrate` y `pnpm db:seed` después de cambiar el esquema.
+
+## Complex changes
+
+Para un feature o un cambio de varios archivos, delega en este orden: `planner`, `implementer`, `verifier`. Están en `.cursor/agents/`. El verifier no edita: devuelve lo que falta y el implementer lo corrige.
