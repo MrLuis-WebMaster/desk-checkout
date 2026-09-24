@@ -4,6 +4,8 @@ export class InitialCatalog1761270000000 implements MigrationInterface {
   name = "InitialCatalog1761270000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "pgcrypto"`);
+
     await queryRunner.query(`
       CREATE TABLE "products" (
         "id" uuid NOT NULL DEFAULT gen_random_uuid(),

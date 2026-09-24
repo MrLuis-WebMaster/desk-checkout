@@ -49,7 +49,8 @@ export class ProductsController {
       throw new HttpException(
         {
           code: ApiErrorCode.ValidationError,
-          message: "Validation failed",
+          message:
+            "Invalid list query: use either page or after/before, not both",
         },
         HttpStatus.BAD_REQUEST,
       );

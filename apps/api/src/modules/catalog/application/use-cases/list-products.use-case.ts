@@ -21,6 +21,9 @@ export class ListProductsUseCase {
     if (query.after && query.before) {
       return err(new InvalidProductCursorError());
     }
+    if (query.page !== undefined && (query.after || query.before)) {
+      return err(new InvalidProductCursorError());
+    }
     if (query.after) {
       const cursor = decodeProductCursor(query.after);
       if (!cursor || cursor.sort !== query.sort || cursor.order !== query.order) {

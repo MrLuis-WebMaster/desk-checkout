@@ -8,11 +8,11 @@ import type {
 import { Repository, type SelectQueryBuilder } from "typeorm";
 import {
   decodeProductCursor,
-  encodeProductCursor,
   type ProductCursorPayload,
   type ProductOrder,
   type ProductSort,
 } from "../../application/queries/product-cursor.js";
+import { buildProductPageCursors } from "../../application/queries/product-page-cursors.js";
 import {
   ProductReader,
   type ListProductsQuery,
@@ -46,10 +46,13 @@ export class TypeOrmProductReader extends ProductReader {
   }
 
   async list(query: ListProductsQuery): Promise<ProductPageDto> {
+    // Cursor mode is authoritative when after/before is present (use case
+    // rejects mixing those with `page`).
     const goingBackward = Boolean(query.before);
     const cursorRaw = query.before ?? query.after;
     const cursor = cursorRaw ? decodeProductCursor(cursorRaw) : null;
-    const pageNumber = cursor ? 1 : (query.page ?? 1);
+    const cursorMode = cursor !== null;
+    const offsetPageNumber = cursorMode ? 1 : (query.page ?? 1);
 
     const countQb = this.products.createQueryBuilder("product");
     this.applyNameFilter(countQb, query.q);
@@ -80,8 +83,8 @@ export class TypeOrmProductReader extends ProductReader {
     }
 
     this.applyOrdering(pageQb, query.sort, effectiveOrder);
-    if (!cursor && pageNumber > 1) {
-      pageQb.offset((pageNumber - 1) * query.pageSize);
+    if (!cursorMode && offsetPageNumber > 1) {
+      pageQb.offset((offsetPageNumber - 1) * query.pageSize);
     }
     pageQb.limit(query.pageSize + 1);
 
@@ -93,22 +96,20 @@ export class TypeOrmProductReader extends ProductReader {
     const hasExtra = rows.length > query.pageSize;
     let pageRows = hasExtra ? rows.slice(0, query.pageSize) : rows;
     if (goingBackward) {
+      // Restore the client's requested order after the inverted keyset fetch.
       pageRows = pageRows.reverse();
     }
 
     const items = pageRows.map(mapSummaryRow);
-
-    const nextCursor =
-      items.length > 0 && (goingBackward || hasExtra)
-        ? cursorFromItem(items[items.length - 1], query.sort, query.order)
-        : null;
-    const prevCursor =
-      items.length > 0 &&
-      ((goingBackward && hasExtra) ||
-        (!goingBackward && Boolean(query.after)) ||
-        (!cursor && pageNumber > 1))
-        ? cursorFromItem(items[0], query.sort, query.order)
-        : null;
+    const { nextCursor, prevCursor } = buildProductPageCursors({
+      items,
+      sort: query.sort,
+      order: query.order,
+      goingBackward,
+      hasExtra,
+      usedAfter: Boolean(query.after),
+      offsetPageNumber,
+    });
 
     return {
       items,
@@ -194,23 +195,6 @@ export class TypeOrmProductReader extends ProductReader {
 
 function invertOrder(order: ProductOrder): ProductOrder {
   return order === "asc" ? "desc" : "asc";
-}
-
-function cursorFromItem(
-  item: ProductSummaryDto | undefined,
-  sort: ProductSort,
-  order: ProductOrder,
-): string | null {
-  if (!item) {
-    return null;
-  }
-  return encodeProductCursor({
-    sort,
-    order,
-    name: item.name,
-    price: item.price,
-    id: item.id,
-  });
 }
 
 function mapSummaryRow(row: ProductListRow): ProductSummaryDto {

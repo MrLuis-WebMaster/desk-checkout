@@ -47,19 +47,34 @@ export class ListProductsQueryDto {
   @IsIn([...PRODUCT_ORDERS])
   order: ProductOrder = "asc";
 
-  @ApiPropertyOptional({ maxLength: 2048, description: "Cursor de la página siguiente" })
+  @ApiPropertyOptional({
+    maxLength: 2048,
+    description:
+      "Cursor de la página siguiente. Mutuamente excluyente con `page` y `before`.",
+  })
   @IsOptional()
   @IsString()
   @MaxLength(2048)
   after?: string;
 
-  @ApiPropertyOptional({ maxLength: 2048, description: "Cursor de la página anterior" })
+  @ApiPropertyOptional({
+    maxLength: 2048,
+    description:
+      "Cursor de la página anterior. Mutuamente excluyente con `page` y `after`.",
+  })
   @IsOptional()
   @IsString()
   @MaxLength(2048)
   before?: string;
 
-  @ApiPropertyOptional({ minimum: 1, maximum: 100, default: 1, type: Number })
+  @ApiPropertyOptional({
+    minimum: 1,
+    maximum: 100,
+    default: 1,
+    type: Number,
+    description:
+      "Página 1-based (offset). Solo cuando no se envían `after`/`before`.",
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()

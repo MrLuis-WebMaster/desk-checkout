@@ -50,7 +50,7 @@ export type ListProductsQuery = {
   order: ProductOrder;
   after?: string;
   before?: string;
-  /** 1-based page. Used when cursors are absent. */
+  /** 1-based page (offset). Mutually exclusive with after/before. */
   page?: number;
 };
 
@@ -84,7 +84,7 @@ export function parseProductOrder(
 
 export function parseProductListPage(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value);
-  if (Number.isInteger(n) && n >= 1 && n <= 10_000) {
+  if (Number.isInteger(n) && n >= 1 && n <= 100) {
     return n;
   }
   return 1;
