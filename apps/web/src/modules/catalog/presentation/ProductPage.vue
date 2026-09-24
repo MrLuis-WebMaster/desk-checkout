@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { watch } from "vue";
 import { useRoute } from "vue-router";
-import { useCheckoutStore } from "../../../stores/checkout";
+import { routeNames } from "@/app/router";
+import { useCheckoutStore } from "@/stores/checkout";
 
-const route = useRoute();
+const route = useRoute(routeNames.product);
 const checkout = useCheckoutStore();
 
-onMounted(() => {
-  const productId = route.params.id;
-  if (typeof productId === "string") {
+watch(
+  () => route.params.id,
+  (productId) => {
     checkout.openProduct(productId);
-  }
-});
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
