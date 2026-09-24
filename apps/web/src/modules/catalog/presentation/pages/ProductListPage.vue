@@ -261,7 +261,7 @@ function goNext() {
           :id="id"
           v-model="searchInput"
           type="search"
-          maxlength="100"
+          :maxlength="100"
           placeholder="Search by name"
           autocomplete="off"
         />
