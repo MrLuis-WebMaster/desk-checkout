@@ -6,6 +6,7 @@ import { Transaction } from "../../domain/transaction/transaction.js";
 import type { IdempotencyStore } from "../ports/idempotency-store.port.js";
 import type { TransactionReader } from "../ports/transaction-reader.port.js";
 import type { TransactionWriter } from "../ports/transaction-writer.port.js";
+import { SettleProviderPaymentService } from "../services/settle-provider-payment.js";
 import { PayTransactionUseCase } from "./pay-transaction.use-case.js";
 
 const payRequest = {
@@ -19,9 +20,14 @@ function pendingTransaction() {
   return Transaction.rehydrate({
     id: "33333333-3333-4333-8333-333333333333",
     status: TransactionStatus.Pending,
-    productId: "11111111-1111-4111-8111-111111111111",
-    productName: "Lamp",
-    productPrice: Money.create(10000),
+    lines: [
+      {
+        productId: "11111111-1111-4111-8111-111111111111",
+        productName: "Lamp",
+        productPrice: Money.create(10000),
+        quantity: 1,
+      },
+    ],
     baseFee: Money.create(500),
     deliveryFee: Money.create(1500),
     total: Money.create(12000),
@@ -33,9 +39,7 @@ function pendingTransaction() {
     delivery: {
       shippingMethodId: "22222222-2222-4222-8222-222222222222",
       addressLine: "Street",
-      city: "Bogotá",
-      regionCode: "BOG",
-      postalCode: "110111",
+      city: "BOG",
     },
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
     providerTransactionId: null,
@@ -48,11 +52,13 @@ describe("PayTransactionUseCase", () => {
     save: jest.fn(),
     claimForPayment: jest.fn(),
     releaseClaim: jest.fn(),
+    attachProviderTransactionId: jest.fn(),
     updateAfterPayment: jest.fn(),
   };
   const gateway = {
     getAcceptanceTokens: jest.fn(),
     createCardPayment: jest.fn(),
+    createWidgetSession: jest.fn(),
     getPaymentStatus: jest.fn(),
   };
   const idempotency = {
@@ -61,11 +67,17 @@ describe("PayTransactionUseCase", () => {
     complete: jest.fn(),
     abort: jest.fn(),
   };
+  const settlement = new SettleProviderPaymentService(
+    writer as TransactionWriter,
+    gateway as PaymentGateway,
+    idempotency as IdempotencyStore,
+  );
   const useCase = new PayTransactionUseCase(
     transactions as TransactionReader,
     writer as TransactionWriter,
     gateway as PaymentGateway,
     idempotency as IdempotencyStore,
+    settlement,
   );
 
   beforeEach(() => {
@@ -73,6 +85,7 @@ describe("PayTransactionUseCase", () => {
     idempotency.find.mockResolvedValue(null);
     writer.claimForPayment.mockResolvedValue(true);
     writer.releaseClaim.mockResolvedValue(undefined);
+    writer.attachProviderTransactionId.mockResolvedValue(undefined);
     idempotency.begin.mockResolvedValue(undefined);
     idempotency.complete.mockResolvedValue(undefined);
     idempotency.abort.mockResolvedValue(undefined);
@@ -96,6 +109,10 @@ describe("PayTransactionUseCase", () => {
     );
 
     expect(result.ok).toBe(true);
+    expect(writer.attachProviderTransactionId).toHaveBeenCalledWith(
+      pendingTransaction().id,
+      "wompi_1",
+    );
     expect(writer.updateAfterPayment).toHaveBeenCalledWith(
       expect.objectContaining({
         status: TransactionStatus.Approved,
@@ -106,6 +123,41 @@ describe("PayTransactionUseCase", () => {
     expect(gateway.getPaymentStatus).not.toHaveBeenCalled();
     expect(gateway.createCardPayment).toHaveBeenCalledWith(
       expect.objectContaining({ amountInCents: 1_200_000 }),
+    );
+  });
+
+  it("persists the provider id before polling a pending charge", async () => {
+    gateway.createCardPayment.mockResolvedValue({
+      providerTransactionId: "wompi_poll",
+      status: TransactionStatus.Pending,
+    });
+    gateway.getPaymentStatus.mockResolvedValue({
+      providerTransactionId: "wompi_poll",
+      status: TransactionStatus.Approved,
+    });
+    writer.updateAfterPayment.mockImplementation(async (transaction) => ({
+      dto: { id: transaction.id, status: transaction.status },
+      stockDecremented: true,
+    }));
+
+    const attachOrder: string[] = [];
+    writer.attachProviderTransactionId.mockImplementation(async () => {
+      attachOrder.push("attach");
+    });
+    gateway.getPaymentStatus.mockImplementation(async () => {
+      attachOrder.push("poll");
+      return {
+        providerTransactionId: "wompi_poll",
+        status: TransactionStatus.Approved,
+      };
+    });
+
+    await useCase.execute(pendingTransaction().id, "key-poll", payRequest);
+
+    expect(attachOrder[0]).toBe("attach");
+    expect(attachOrder).toContain("poll");
+    expect(attachOrder.indexOf("attach")).toBeLessThan(
+      attachOrder.indexOf("poll"),
     );
   });
 
@@ -151,7 +203,10 @@ describe("PayTransactionUseCase", () => {
   });
 
   it("replays a stored response without charging again", async () => {
-    const stored = { id: pendingTransaction().id, status: TransactionStatus.Approved };
+    const stored = {
+      id: pendingTransaction().id,
+      status: TransactionStatus.Approved,
+    };
     idempotency.find.mockResolvedValue({
       transactionId: pendingTransaction().id,
       requestHash: expect.any(String),
@@ -225,7 +280,10 @@ describe("PayTransactionUseCase", () => {
       status: TransactionStatus.Approved,
     });
     writer.updateAfterPayment.mockResolvedValue({
-      dto: { id: pendingTransaction().id, status: TransactionStatus.Approved },
+      dto: {
+        id: pendingTransaction().id,
+        status: TransactionStatus.Error,
+      },
       stockDecremented: false,
     });
 
@@ -242,7 +300,9 @@ describe("PayTransactionUseCase", () => {
   });
 
   it("releases the claim when the provider fails before a charge exists", async () => {
-    gateway.createCardPayment.mockRejectedValue(new PaymentGatewayError("down"));
+    gateway.createCardPayment.mockRejectedValue(
+      new PaymentGatewayError("down"),
+    );
     const result = await useCase.execute(
       pendingTransaction().id,
       "key-8",
@@ -253,16 +313,49 @@ describe("PayTransactionUseCase", () => {
       expect(result.error.code).toBe("PAYMENT_FAILED");
     }
     expect(writer.releaseClaim).toHaveBeenCalledWith(pendingTransaction().id);
+    expect(writer.attachProviderTransactionId).not.toHaveBeenCalled();
     expect(idempotency.abort).toHaveBeenCalledWith("key-8");
+  });
+
+  it("keeps the provider id when polling fails after attach", async () => {
+    gateway.createCardPayment.mockResolvedValue({
+      providerTransactionId: "wompi_keep",
+      status: TransactionStatus.Pending,
+    });
+    gateway.getPaymentStatus.mockRejectedValue(
+      new PaymentGatewayError("poll down"),
+    );
+
+    const result = await useCase.execute(
+      pendingTransaction().id,
+      "key-keep",
+      payRequest,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("PAYMENT_FAILED");
+    }
+    expect(writer.attachProviderTransactionId).toHaveBeenCalledWith(
+      pendingTransaction().id,
+      "wompi_keep",
+    );
+    expect(writer.releaseClaim).not.toHaveBeenCalled();
+    expect(idempotency.abort).toHaveBeenCalledWith("key-keep");
   });
 
   it("settles a pending provider charge when a later poll is approved", async () => {
     const charged = Transaction.rehydrate({
       id: pendingTransaction().id,
       status: TransactionStatus.Pending,
-      productId: "11111111-1111-4111-8111-111111111111",
-      productName: "Lamp",
-      productPrice: Money.create(10000),
+      lines: [
+        {
+          productId: "11111111-1111-4111-8111-111111111111",
+          productName: "Lamp",
+          productPrice: Money.create(10000),
+          quantity: 1,
+        },
+      ],
       baseFee: Money.create(500),
       deliveryFee: Money.create(1500),
       total: Money.create(12000),

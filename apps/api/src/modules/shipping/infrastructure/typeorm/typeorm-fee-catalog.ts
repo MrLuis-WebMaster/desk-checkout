@@ -1,8 +1,8 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import type {
+  ShippingCityCode,
   ShippingMethodQuoteDto,
-  ShippingRegionCode,
 } from "@checkout/contracts";
 import { Repository } from "typeorm";
 import {
@@ -33,7 +33,7 @@ export class TypeOrmFeeCatalog extends FeeCatalog {
 
   async getRate(
     methodId: string,
-    regionCode: ShippingRegionCode,
+    city: ShippingCityCode,
   ): Promise<ShippingRateLookup> {
     const method = await this.methods.findOne({
       where: { id: methodId, active: true },
@@ -42,21 +42,19 @@ export class TypeOrmFeeCatalog extends FeeCatalog {
       return { methodFound: false, amount: null };
     }
     const rate = await this.rates.findOne({
-      where: { shippingMethodId: methodId, regionCode },
+      where: { shippingMethodId: methodId, regionCode: city },
     });
     return { methodFound: true, amount: rate?.amountCents ?? null };
   }
 
-  async listQuotes(
-    regionCode: ShippingRegionCode,
-  ): Promise<ShippingMethodQuoteDto[]> {
+  async listQuotes(city: ShippingCityCode): Promise<ShippingMethodQuoteDto[]> {
     const rows = await this.methods
       .createQueryBuilder("method")
       .innerJoin(
         "shipping_rates",
         "rate",
-        "rate.shipping_method_id = method.id AND rate.region_code = :regionCode",
-        { regionCode },
+        "rate.shipping_method_id = method.id AND rate.region_code = :city",
+        { city },
       )
       .select([
         "method.id AS id",

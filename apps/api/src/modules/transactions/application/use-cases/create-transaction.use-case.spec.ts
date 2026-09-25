@@ -4,8 +4,10 @@ import { CreateTransactionUseCase } from "./create-transaction.use-case.js";
 import type { ProductStockReader } from "../ports/product-stock-reader.port.js";
 import type { TransactionWriter } from "../ports/transaction-writer.port.js";
 
+const productId = "11111111-1111-4111-8111-111111111111";
+
 const request = {
-  productId: "11111111-1111-4111-8111-111111111111",
+  items: [{ productId, quantity: 1 }],
   customer: {
     fullName: "Ada Lovelace",
     email: "ada@example.com",
@@ -14,9 +16,7 @@ const request = {
   delivery: {
     shippingMethodId: "22222222-2222-4222-8222-222222222222",
     addressLine: "Calle 1 # 2-3",
-    city: "Bogotá",
-    regionCode: "BOG" as const,
-    postalCode: "110111",
+    city: "BOG" as const,
   },
 };
 
@@ -41,7 +41,7 @@ describe("CreateTransactionUseCase", () => {
   beforeEach(() => {
     jest.resetAllMocks();
     productStockReader.findById.mockResolvedValue({
-      id: request.productId,
+      id: productId,
       name: "Keyboard",
       price: 100000,
       availableStock: 2,
@@ -57,6 +57,13 @@ describe("CreateTransactionUseCase", () => {
       productId: transaction.productId,
       productName: transaction.productName,
       productPrice: transaction.productPrice.amount,
+      quantity: transaction.quantity,
+      lines: transaction.lines.map((line) => ({
+        productId: line.productId,
+        productName: line.productName,
+        productPrice: line.productPrice.amount,
+        quantity: line.quantity,
+      })),
       baseFee: transaction.baseFee.amount,
       deliveryFee: transaction.deliveryFee.amount,
       total: transaction.total.amount,
@@ -87,6 +94,43 @@ describe("CreateTransactionUseCase", () => {
     expect(transactionWriter.save).toHaveBeenCalledTimes(1);
   });
 
+  it("creates a transaction with multiple line items", async () => {
+    const secondId = "44444444-4444-4444-8444-444444444444";
+    productStockReader.findById.mockImplementation(async (id: string) => {
+      if (id === productId) {
+        return {
+          id: productId,
+          name: "Keyboard",
+          price: 100000,
+          availableStock: 2,
+        };
+      }
+      if (id === secondId) {
+        return {
+          id: secondId,
+          name: "Mouse",
+          price: 50000,
+          availableStock: 5,
+        };
+      }
+      return null;
+    });
+
+    const result = await useCase.execute({
+      ...request,
+      items: [
+        { productId, quantity: 1 },
+        { productId: secondId, quantity: 2 },
+      ],
+    });
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.total).toBe(213000);
+      expect(result.value.lines).toHaveLength(2);
+    }
+  });
+
   it("returns ProductNotFound when the product is missing", async () => {
     productStockReader.findById.mockResolvedValue(null);
     const result = await useCase.execute(request);
@@ -98,7 +142,7 @@ describe("CreateTransactionUseCase", () => {
 
   it("returns OutOfStock when inventory is zero", async () => {
     productStockReader.findById.mockResolvedValue({
-      id: request.productId,
+      id: productId,
       name: "Keyboard",
       price: 100000,
       availableStock: 0,

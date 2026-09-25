@@ -5,7 +5,10 @@ export function toCreateTransactionRequest(
   dto: CreateTransactionDto,
 ): CreateTransactionRequest {
   return {
-    productId: dto.productId,
+    items: dto.items.map((item) => ({
+      productId: item.productId,
+      quantity: item.quantity,
+    })),
     customer: { ...dto.customer },
     delivery: { ...dto.delivery },
   };

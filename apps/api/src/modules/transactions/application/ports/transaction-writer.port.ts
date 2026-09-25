@@ -10,6 +10,11 @@ export abstract class TransactionWriter {
   abstract save(transaction: Transaction): Promise<TransactionDto>;
   abstract claimForPayment(transactionId: string): Promise<boolean>;
   abstract releaseClaim(transactionId: string): Promise<void>;
+  /** Replace a payment claim with the real provider transaction id. */
+  abstract attachProviderTransactionId(
+    transactionId: string,
+    providerTransactionId: string,
+  ): Promise<void>;
   abstract updateAfterPayment(
     transaction: Transaction,
     options: { decrementStock: boolean },

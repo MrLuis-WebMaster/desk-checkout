@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { computeLineSubtotal } from "@checkout/contracts";
 import {
   parseStoredLines,
   type CartLine,
@@ -22,7 +23,8 @@ export const useCartStore = defineStore("cart", {
     },
     subtotal(state): number {
       return state.lines.reduce(
-        (total, line) => total + line.price * line.quantity,
+        (total, line) =>
+          total + computeLineSubtotal(line.price, line.quantity),
         0,
       );
     },
@@ -70,6 +72,9 @@ export const useCartStore = defineStore("cart", {
     remove(productId: string) {
       this.lines = this.lines.filter((line) => line.productId !== productId);
       this.open();
+    },
+    clear() {
+      this.lines = [];
     },
   },
   persist: {

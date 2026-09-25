@@ -1,5 +1,7 @@
 import { Transform, Type } from "class-transformer";
 import {
+  ArrayMinSize,
+  IsArray,
   IsDefined,
   IsEmail,
   IsIn,
@@ -15,12 +17,14 @@ import {
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import {
-  SHIPPING_REGION_CODES,
+  SHIPPING_CITY_CODES,
   TransactionStatus,
   type CreateTransactionRequest,
   type PayTransactionRequest,
-  type ShippingRegionCode,
+  type ShippingCityCode,
+  type SyncProviderPaymentRequest,
   type TransactionDto,
+  type WidgetCheckoutSessionDto,
 } from "@checkout/contracts";
 
 function trimString({ value }: { value: unknown }): unknown {
@@ -60,29 +64,32 @@ export class CreateTransactionDeliveryDto {
   @MaxLength(300)
   addressLine!: string;
 
-  @ApiProperty()
-  @Transform(trimString)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(120)
-  city!: string;
-
-  @ApiProperty({ enum: SHIPPING_REGION_CODES })
-  @IsIn(SHIPPING_REGION_CODES)
-  regionCode!: ShippingRegionCode;
-
-  @ApiProperty()
-  @Transform(trimString)
-  @IsString()
-  @IsNotEmpty()
-  @MaxLength(20)
-  postalCode!: string;
+  @ApiProperty({ enum: SHIPPING_CITY_CODES })
+  @IsIn(SHIPPING_CITY_CODES)
+  city!: ShippingCityCode;
 }
 
-export class CreateTransactionDto implements CreateTransactionRequest {
+export class CreateTransactionItemDto {
   @ApiProperty({ format: "uuid" })
   @IsUUID("4")
   productId!: string;
+
+  @ApiProperty({ minimum: 1, maximum: 99 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(99)
+  quantity!: number;
+}
+
+export class CreateTransactionDto implements CreateTransactionRequest {
+  @ApiProperty({ type: [CreateTransactionItemDto], minItems: 1 })
+  @IsDefined()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => CreateTransactionItemDto)
+  items!: CreateTransactionItemDto[];
 
   @ApiProperty({ type: CreateTransactionCustomerDto })
   @IsDefined()
@@ -124,10 +131,54 @@ export class PayTransactionDto implements PayTransactionRequest {
   installments?: number;
 }
 
+export class SyncProviderPaymentDto implements SyncProviderPaymentRequest {
+  @ApiProperty()
+  @Transform(trimString)
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(120)
+  providerTransactionId!: string;
+}
+
+export class WidgetCheckoutSessionResponseDto
+  implements WidgetCheckoutSessionDto
+{
+  @ApiProperty()
+  publicKey!: string;
+
+  @ApiProperty()
+  amountInCents!: number;
+
+  @ApiProperty({ enum: ["COP"] })
+  currency!: "COP";
+
+  @ApiProperty()
+  reference!: string;
+
+  @ApiProperty()
+  signature!: string;
+}
+
 export class TransactionParamsDto {
   @ApiProperty({ format: "uuid" })
   @IsUUID("4")
   id!: string;
+}
+
+export class TransactionLineResponseDto {
+  @ApiProperty({ format: "uuid" })
+  productId!: string;
+
+  @ApiProperty()
+  productName!: string;
+
+  @ApiProperty({
+    description: "Snapshot product price in integer COP units",
+  })
+  productPrice!: number;
+
+  @ApiProperty({ minimum: 1 })
+  quantity!: number;
 }
 
 export class TransactionResponseDto implements TransactionDto {
@@ -147,6 +198,12 @@ export class TransactionResponseDto implements TransactionDto {
     description: "Snapshot product price in integer COP units",
   })
   productPrice!: number;
+
+  @ApiProperty({ minimum: 1 })
+  quantity!: number;
+
+  @ApiProperty({ type: [TransactionLineResponseDto] })
+  lines!: TransactionLineResponseDto[];
 
   @ApiProperty({
     description: "Snapshot base fee in integer COP units",

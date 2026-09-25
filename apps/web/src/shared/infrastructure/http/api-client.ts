@@ -30,6 +30,12 @@ export type ApiGetOptions = {
   signal?: AbortSignal;
 };
 
+export type ApiPostOptions = {
+  query?: Record<string, string | undefined>;
+  headers?: Record<string, string>;
+  signal?: AbortSignal;
+};
+
 function isApiSuccess<T>(body: object): body is ApiSuccess<T> {
   return (
     "ok" in body &&
@@ -132,16 +138,21 @@ export class ApiClient {
   post<T>(
     path: string,
     body?: unknown,
-    query?: Record<string, string | undefined>,
+    queryOrOptions?: Record<string, string | undefined> | ApiPostOptions,
   ): Promise<ApiClientResult<T>> {
+    const options = normalizePostOptions(queryOrOptions);
     return this.request<T>(
       path,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...options.headers,
+        },
         body: body === undefined ? undefined : JSON.stringify(body),
+        signal: options.signal,
       },
-      query,
+      options.query,
     );
   }
 
@@ -205,6 +216,24 @@ function normalizeGetOptions(
   return {
     query: queryOrOptions as Record<string, string | undefined>,
     signal: maybeOptions?.signal,
+  };
+}
+
+function normalizePostOptions(
+  queryOrOptions?: Record<string, string | undefined> | ApiPostOptions,
+): ApiPostOptions {
+  if (!queryOrOptions) {
+    return {};
+  }
+  if (
+    "query" in queryOrOptions ||
+    "headers" in queryOrOptions ||
+    "signal" in queryOrOptions
+  ) {
+    return queryOrOptions as ApiPostOptions;
+  }
+  return {
+    query: queryOrOptions as Record<string, string | undefined>,
   };
 }
 

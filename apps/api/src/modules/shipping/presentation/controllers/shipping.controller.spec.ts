@@ -23,12 +23,12 @@ describe("ShippingController", () => {
     jest.resetAllMocks();
   });
 
-  it("returns regional shipping quotes", async () => {
+  it("returns shipping quotes for a city", async () => {
     const quotes = [
       { id: "method", code: "standard", name: "Standard", amount: 8000 },
     ];
     listShippingQuotes.execute.mockResolvedValue(ok(quotes));
-    await expect(controller.list({ region: "BOG" })).resolves.toEqual(quotes);
+    await expect(controller.list({ city: "BOG" })).resolves.toEqual(quotes);
   });
 
   it("maps missing checkout settings to HTTP 503", async () => {

@@ -5,7 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
-import type { ShippingRegionCode } from "@checkout/contracts";
+import type { ShippingCityCode } from "@checkout/contracts";
 
 @Entity({ name: "deliveries" })
 export class DeliveryOrmEntity {
@@ -18,14 +18,8 @@ export class DeliveryOrmEntity {
   @Column({ name: "address_line", type: "varchar", length: 300 })
   addressLine!: string;
 
-  @Column({ type: "varchar", length: 120 })
-  city!: string;
-
-  @Column({ name: "region_code", type: "varchar", length: 20 })
-  regionCode!: ShippingRegionCode;
-
-  @Column({ name: "postal_code", type: "varchar", length: 20 })
-  postalCode!: string;
+  @Column({ type: "varchar", length: 20 })
+  city!: ShippingCityCode;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;

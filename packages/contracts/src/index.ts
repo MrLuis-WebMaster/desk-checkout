@@ -152,9 +152,15 @@ export type ProductPageDto = {
   prevCursor: string | null;
 };
 
-export const SHIPPING_REGION_CODES = ["BOG", "MED", "CALI", "OTHER"] as const;
+export const SHIPPING_CITY_CODES = ["BOG", "MED", "CALI", "OTHER"] as const;
 
-export type ShippingRegionCode = (typeof SHIPPING_REGION_CODES)[number];
+export type ShippingCityCode = (typeof SHIPPING_CITY_CODES)[number];
+
+/** @deprecated Use SHIPPING_CITY_CODES */
+export const SHIPPING_REGION_CODES = SHIPPING_CITY_CODES;
+
+/** @deprecated Use ShippingCityCode */
+export type ShippingRegionCode = ShippingCityCode;
 
 /** Quote amount in the same integer COP units as `ProductDto.price`. */
 export type ShippingMethodQuoteDto = {
@@ -178,13 +184,16 @@ export type TransactionCustomerDto = {
 export type TransactionDeliveryDto = {
   shippingMethodId: string;
   addressLine: string;
-  city: string;
-  regionCode: ShippingRegionCode;
-  postalCode: string;
+  city: ShippingCityCode;
+};
+
+export type CreateTransactionItemDto = {
+  productId: string;
+  quantity: number;
 };
 
 export type CreateTransactionRequest = {
-  productId: string;
+  items: CreateTransactionItemDto[];
   customer: TransactionCustomerDto;
   delivery: TransactionDeliveryDto;
 };
@@ -204,12 +213,33 @@ export type PayTransactionRequest = {
   installments?: number;
 };
 
+export type WidgetCheckoutSessionDto = {
+  publicKey: string;
+  amountInCents: number;
+  currency: "COP";
+  reference: string;
+  signature: string;
+};
+
+export type SyncProviderPaymentRequest = {
+  providerTransactionId: string;
+};
+
+export type TransactionLineDto = {
+  productId: string;
+  productName: string;
+  productPrice: number;
+  quantity: number;
+};
+
 export type TransactionDto = {
   id: string;
   status: TransactionStatus;
   productId: string;
   productName: string;
   productPrice: number;
+  quantity: number;
+  lines: TransactionLineDto[];
   baseFee: number;
   deliveryFee: number;
   total: number;
@@ -222,3 +252,13 @@ export type HealthDto = {
   status: "ok";
   transactionStatuses: typeof TransactionStatus;
 };
+
+export {
+  computeCheckoutTotal,
+  computeLineSubtotal,
+  computeMerchandiseTotal,
+  computeOrderTotal,
+  normalizeCheckoutQuantity,
+  type CheckoutLineInput,
+  type CheckoutTotalInput,
+} from "./checkout-total.js";

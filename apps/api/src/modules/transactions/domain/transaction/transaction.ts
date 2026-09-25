@@ -1,7 +1,9 @@
 import { randomUUID } from "node:crypto";
 import {
   TransactionStatus,
-  type ShippingRegionCode,
+  computeOrderTotal,
+  normalizeCheckoutQuantity,
+  type ShippingCityCode,
 } from "@checkout/contracts";
 import { Money } from "#shared/domain/money.js";
 import { InvalidTransactionStateError } from "./errors.js";
@@ -15,18 +17,21 @@ export type TransactionCustomer = {
 export type TransactionDelivery = {
   shippingMethodId: string;
   addressLine: string;
-  city: string;
-  regionCode: ShippingRegionCode;
-  postalCode: string;
+  city: ShippingCityCode;
+};
+
+export type TransactionLine = {
+  productId: string;
+  productName: string;
+  productPrice: Money;
+  quantity: number;
 };
 
 export class Transaction {
   private constructor(
     readonly id: string,
     readonly status: TransactionStatus,
-    readonly productId: string,
-    readonly productName: string,
-    readonly productPrice: Money,
+    readonly lines: TransactionLine[],
     readonly baseFee: Money,
     readonly deliveryFee: Money,
     readonly total: Money,
@@ -36,26 +41,56 @@ export class Transaction {
     readonly providerTransactionId: string | null,
   ) {}
 
+  get productId(): string {
+    return this.lines[0]?.productId ?? "";
+  }
+
+  get productName(): string {
+    if (this.lines.length === 0) {
+      return "";
+    }
+    if (this.lines.length === 1) {
+      return this.lines[0]!.productName;
+    }
+    return `${this.lines[0]!.productName} +${this.lines.length - 1} more`;
+  }
+
+  get productPrice(): Money {
+    return this.lines[0]?.productPrice ?? Money.create(0);
+  }
+
+  get quantity(): number {
+    return this.lines[0]?.quantity ?? 1;
+  }
+
   static createPending(props: {
-    productId: string;
-    productName: string;
-    productPrice: Money;
+    lines: TransactionLine[];
     baseFee: Money;
     deliveryFee: Money;
     customer: TransactionCustomer;
     delivery: TransactionDelivery;
   }): Transaction {
+    const lines = props.lines.map((line) => ({
+      ...line,
+      quantity: normalizeCheckoutQuantity(line.quantity),
+    }));
+    if (lines.length === 0) {
+      throw new Error("Transaction requires at least one line");
+    }
     const total = Money.create(
-      props.productPrice.amount +
-        props.baseFee.amount +
-        props.deliveryFee.amount,
+      computeOrderTotal({
+        lines: lines.map((line) => ({
+          unitPrice: line.productPrice.amount,
+          quantity: line.quantity,
+        })),
+        baseFee: props.baseFee.amount,
+        deliveryFee: props.deliveryFee.amount,
+      }),
     );
     return new Transaction(
       randomUUID(),
       TransactionStatus.Pending,
-      props.productId,
-      props.productName,
-      props.productPrice,
+      lines,
       props.baseFee,
       props.deliveryFee,
       total,
@@ -69,9 +104,7 @@ export class Transaction {
   static rehydrate(props: {
     id: string;
     status: TransactionStatus;
-    productId: string;
-    productName: string;
-    productPrice: Money;
+    lines: TransactionLine[];
     baseFee: Money;
     deliveryFee: Money;
     total: Money;
@@ -83,9 +116,7 @@ export class Transaction {
     return new Transaction(
       props.id,
       props.status,
-      props.productId,
-      props.productName,
-      props.productPrice,
+      props.lines,
       props.baseFee,
       props.deliveryFee,
       props.total,
@@ -139,9 +170,7 @@ export class Transaction {
     return new Transaction(
       this.id,
       status,
-      this.productId,
-      this.productName,
-      this.productPrice,
+      this.lines,
       this.baseFee,
       this.deliveryFee,
       this.total,

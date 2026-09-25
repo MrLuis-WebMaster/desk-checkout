@@ -8,6 +8,9 @@ import { CatalogListIndexes1761271000000 } from "./migrations/1761271000000-Cata
 import { CheckoutData1790280000000 } from "./migrations/1790280000000-CheckoutData.js";
 import { IdempotencyKeys1790290000000 } from "./migrations/1790290000000-IdempotencyKeys.js";
 import { IdempotencyErrorCode1790300000000 } from "./migrations/1790300000000-IdempotencyErrorCode.js";
+import { TransactionQuantity1790310000000 } from "./migrations/1790310000000-TransactionQuantity.js";
+import { DeliveryCityOnly1790320000000 } from "./migrations/1790320000000-DeliveryCityOnly.js";
+import { TransactionLineItems1790330000000 } from "./migrations/1790330000000-TransactionLineItems.js";
 import { CheckoutSettingOrmEntity } from "#modules/shipping/infrastructure/typeorm/checkout-setting.orm-entity.js";
 import { ShippingMethodOrmEntity } from "#modules/shipping/infrastructure/typeorm/shipping-method.orm-entity.js";
 import { ShippingRateOrmEntity } from "#modules/shipping/infrastructure/typeorm/shipping-rate.orm-entity.js";
@@ -43,6 +46,9 @@ export function buildDataSourceOptions(): DataSourceOptions {
       CheckoutData1790280000000,
       IdempotencyKeys1790290000000,
       IdempotencyErrorCode1790300000000,
+      TransactionQuantity1790310000000,
+      DeliveryCityOnly1790320000000,
+      TransactionLineItems1790330000000,
     ],
   };
 }

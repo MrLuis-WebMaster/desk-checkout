@@ -7,6 +7,7 @@ import {
   type AcceptanceTokens,
   type CardPaymentInput,
   type ProviderPayment,
+  type WidgetCheckoutSession,
 } from "../../application/ports/payment-gateway.port.js";
 import { wompiIntegritySignature } from "./wompi-signature.js";
 
@@ -84,6 +85,25 @@ export class WompiHttpPaymentGateway extends PaymentGateway {
       }),
     });
     return this.toProviderPayment(body);
+  }
+
+  createWidgetSession(input: {
+    reference: string;
+    amountInCents: number;
+    currency: "COP";
+  }): WidgetCheckoutSession {
+    return {
+      publicKey: this.publicKey,
+      amountInCents: input.amountInCents,
+      currency: input.currency,
+      reference: input.reference,
+      signature: wompiIntegritySignature(
+        input.reference,
+        input.amountInCents,
+        input.currency,
+        this.integritySecret,
+      ),
+    };
   }
 
   async getPaymentStatus(

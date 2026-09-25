@@ -1,16 +1,23 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { IsIn } from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsIn, IsOptional } from "class-validator";
 import {
-  SHIPPING_REGION_CODES,
+  SHIPPING_CITY_CODES,
   type CheckoutSettingsDto,
+  type ShippingCityCode,
   type ShippingMethodQuoteDto,
-  type ShippingRegionCode,
 } from "@checkout/contracts";
 
-export class ShippingRegionQueryDto {
-  @ApiProperty({ enum: SHIPPING_REGION_CODES })
-  @IsIn(SHIPPING_REGION_CODES)
-  region!: ShippingRegionCode;
+export class ShippingCityQueryDto {
+  @ApiPropertyOptional({ enum: SHIPPING_CITY_CODES })
+  @IsOptional()
+  @IsIn(SHIPPING_CITY_CODES)
+  city?: ShippingCityCode;
+
+  /** @deprecated Use `city`. */
+  @ApiPropertyOptional({ enum: SHIPPING_CITY_CODES, deprecated: true })
+  @IsOptional()
+  @IsIn(SHIPPING_CITY_CODES)
+  region?: ShippingCityCode;
 }
 
 export class ShippingMethodQuoteResponseDto

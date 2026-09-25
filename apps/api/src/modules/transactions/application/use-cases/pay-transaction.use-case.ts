@@ -17,9 +17,14 @@ import {
   PaymentFailedError,
   TransactionNotFoundError,
 } from "../../domain/transaction/errors.js";
+import { toProviderAmountInCents } from "../../domain/transaction/provider-amount.js";
 import { IdempotencyStore } from "../ports/idempotency-store.port.js";
 import { TransactionReader } from "../ports/transaction-reader.port.js";
 import { TransactionWriter } from "../ports/transaction-writer.port.js";
+import {
+  isUniqueViolation,
+  SettleProviderPaymentService,
+} from "../services/settle-provider-payment.js";
 
 type PayError =
   | TransactionNotFoundError
@@ -28,9 +33,6 @@ type PayError =
   | IdempotencyConflictError
   | OutOfStockError;
 
-const POLL_ATTEMPTS = 5;
-const POLL_DELAY_MS = process.env.NODE_ENV === "test" ? 0 : 1000;
-
 @Injectable()
 export class PayTransactionUseCase {
   constructor(
@@ -38,6 +40,7 @@ export class PayTransactionUseCase {
     private readonly writer: TransactionWriter,
     private readonly gateway: PaymentGateway,
     private readonly idempotency: IdempotencyStore,
+    private readonly settlement: SettleProviderPaymentService,
   ) {}
 
   async execute(
@@ -81,13 +84,14 @@ export class PayTransactionUseCase {
 
     let provider: ProviderPayment | undefined;
     let claimed = false;
+    let providerIdAttached = false;
     try {
       if (transaction.hasProviderCharge()) {
         if (transaction.status !== TransactionStatus.Pending) {
           await this.idempotency.abort(idempotencyKey);
           return err(new InvalidTransactionStateError());
         }
-        provider = await this.gateway.getPaymentStatus(
+        provider = await this.settlement.pollUntilResolved(
           transaction.providerTransactionId as string,
         );
       } else if (transaction.canStartPayment()) {
@@ -98,7 +102,7 @@ export class PayTransactionUseCase {
         }
         provider = await this.gateway.createCardPayment({
           reference: transaction.id,
-          amountInCents: transaction.total.amount * 100,
+          amountInCents: toProviderAmountInCents(transaction.total),
           currency: "COP",
           paymentMethodToken: request.paymentMethodToken,
           acceptanceToken: request.acceptanceToken,
@@ -106,67 +110,30 @@ export class PayTransactionUseCase {
           installments: request.installments ?? 1,
           customerEmail: transaction.customer.email,
         });
+        await this.writer.attachProviderTransactionId(
+          transaction.id,
+          provider.providerTransactionId,
+        );
+        providerIdAttached = true;
+        if (provider.status === TransactionStatus.Pending) {
+          provider = await this.settlement.pollUntilResolved(
+            provider.providerTransactionId,
+          );
+        }
       } else {
         await this.idempotency.abort(idempotencyKey);
         return err(new InvalidTransactionStateError());
       }
-      for (
-        let attempt = 0;
-        provider.status === TransactionStatus.Pending &&
-        attempt < POLL_ATTEMPTS;
-        attempt += 1
-      ) {
-        await delay(POLL_DELAY_MS);
-        provider = await this.gateway.getPaymentStatus(
-          provider.providerTransactionId,
-        );
-      }
     } catch {
-      if (!provider && claimed) {
+      if (claimed && !providerIdAttached) {
         await this.writer.releaseClaim(transaction.id);
-        await this.idempotency.abort(idempotencyKey);
       }
+      await this.idempotency.abort(idempotencyKey);
       return err(new PaymentFailedError());
     }
 
-    let settled;
-    try {
-      settled = transaction.applyProviderResult(
-        provider.providerTransactionId,
-        provider.status,
-      );
-    } catch (error) {
-      if (error instanceof InvalidTransactionStateError) {
-        return err(error);
-      }
-      throw error;
-    }
-
-    const saved = await this.writer.updateAfterPayment(settled, {
-      decrementStock: settled.status === TransactionStatus.Approved,
-    });
-    if (
-      settled.status === TransactionStatus.Approved &&
-      !saved.stockDecremented
-    ) {
-      await this.idempotency.complete(
-        idempotencyKey,
-        saved.dto,
-        "OUT_OF_STOCK",
-      );
-      return err(new OutOfStockError());
-    }
-    await this.idempotency.complete(idempotencyKey, saved.dto);
-    return ok(saved.dto);
+    return this.settlement.settle(transaction, provider, idempotencyKey);
   }
-}
-
-function isUniqueViolation(error: unknown): boolean {
-  if (!error || typeof error !== "object") {
-    return false;
-  }
-  const candidate = error as { code?: string; driverError?: { code?: string } };
-  return candidate.code === "23505" || candidate.driverError?.code === "23505";
 }
 
 function hashPayRequest(request: PayTransactionRequest): string {
@@ -180,10 +147,4 @@ function hashPayRequest(request: PayTransactionRequest): string {
       }),
     )
     .digest("hex");
-}
-
-function delay(ms: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 }

@@ -37,12 +37,25 @@ export class CreateTransactionUseCase {
   async execute(
     request: CreateTransactionRequest,
   ): Promise<Result<TransactionDto, CreateTransactionError>> {
-    const product = await this.productStockReader.findById(request.productId);
-    if (!product) {
+    if (!request.items?.length) {
       return err(new ProductNotFoundError());
     }
-    if (product.availableStock < 1) {
-      return err(new OutOfStockError());
+
+    const lines = [];
+    for (const item of request.items) {
+      const product = await this.productStockReader.findById(item.productId);
+      if (!product) {
+        return err(new ProductNotFoundError());
+      }
+      if (product.availableStock < item.quantity) {
+        return err(new OutOfStockError());
+      }
+      lines.push({
+        productId: product.id,
+        productName: product.name,
+        productPrice: Money.create(product.price),
+        quantity: item.quantity,
+      });
     }
 
     const baseFee = await this.feeCatalog.getBaseFee();
@@ -52,28 +65,24 @@ export class CreateTransactionUseCase {
 
     const rate = await this.feeCatalog.getRate(
       request.delivery.shippingMethodId,
-      request.delivery.regionCode,
+      request.delivery.city,
     );
     if (!rate.methodFound) {
       return err(
-        new ShippingMethodNotFoundError(
-          request.delivery.shippingMethodId,
-        ),
+        new ShippingMethodNotFoundError(request.delivery.shippingMethodId),
       );
     }
     if (rate.amount === null) {
       return err(
         new ShippingRateNotFoundError(
           request.delivery.shippingMethodId,
-          request.delivery.regionCode,
+          request.delivery.city,
         ),
       );
     }
 
     const transaction = Transaction.createPending({
-      productId: product.id,
-      productName: product.name,
-      productPrice: Money.create(product.price),
+      lines,
       baseFee: Money.create(baseFee),
       deliveryFee: Money.create(rate.amount),
       customer: request.customer,

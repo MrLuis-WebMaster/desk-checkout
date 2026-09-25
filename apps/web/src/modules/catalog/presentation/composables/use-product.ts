@@ -8,7 +8,7 @@ import { toProductIdParam } from "@/modules/catalog/presentation/mappers/catalog
 import { createAbortScope } from "@/modules/catalog/presentation/composables/abort-scope";
 
 export function useProduct(
-  routeName: typeof routeNames.product | typeof routeNames.checkout = routeNames.product,
+  routeName: typeof routeNames.product = routeNames.product,
   onProductId?: (productId: string) => void,
 ) {
   const route = useRoute(routeName);

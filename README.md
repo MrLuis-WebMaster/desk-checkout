@@ -41,7 +41,7 @@ PostgreSQL listens on `localhost:5433` (container port 5432). Database, user, an
 
 ### Checkout data API
 
-- `GET /shipping-methods?region=BOG` — active shipping methods with their regional fee
+- `GET /shipping-methods?city=BOG` — active shipping methods with their city fee
 - `GET /checkout/settings` — current base fee
 - `POST /transactions` — creates a guest transaction in `PENDING` status
 - `GET /transactions/:id` — returns the transaction with pricing snapshots

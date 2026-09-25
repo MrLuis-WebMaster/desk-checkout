@@ -11,7 +11,10 @@ import { TransactionReader } from "../application/ports/transaction-reader.port.
 import { TransactionWriter } from "../application/ports/transaction-writer.port.js";
 import { CreateTransactionUseCase } from "../application/use-cases/create-transaction.use-case.js";
 import { GetTransactionUseCase } from "../application/use-cases/get-transaction.use-case.js";
+import { GetWidgetCheckoutSessionUseCase } from "../application/use-cases/get-widget-checkout-session.use-case.js";
 import { PayTransactionUseCase } from "../application/use-cases/pay-transaction.use-case.js";
+import { SyncProviderPaymentUseCase } from "../application/use-cases/sync-provider-payment.use-case.js";
+import { SettleProviderPaymentService } from "../application/services/settle-provider-payment.js";
 import { CustomerOrmEntity } from "../infrastructure/typeorm/customer.orm-entity.js";
 import { DeliveryOrmEntity } from "../infrastructure/typeorm/delivery.orm-entity.js";
 import { IdempotencyKeyOrmEntity } from "../infrastructure/typeorm/idempotency-key.orm-entity.js";
@@ -40,13 +43,15 @@ import { TransactionsController } from "./controllers/transactions.controller.js
   providers: [
     CreateTransactionUseCase,
     GetTransactionUseCase,
+    GetWidgetCheckoutSessionUseCase,
     PayTransactionUseCase,
+    SyncProviderPaymentUseCase,
+    SettleProviderPaymentService,
     { provide: ProductStockReader, useClass: TypeOrmProductStockReader },
     { provide: TransactionWriter, useClass: TypeOrmTransactionWriter },
     { provide: TransactionReader, useClass: TypeOrmTransactionReader },
-    TypeOrmInventoryWriter,
+    { provide: InventoryWriter, useClass: TypeOrmInventoryWriter },
     { provide: IdempotencyStore, useClass: TypeOrmIdempotencyStore },
-    { provide: InventoryWriter, useExisting: TypeOrmInventoryWriter },
   ],
 })
 export class TransactionsModule {}

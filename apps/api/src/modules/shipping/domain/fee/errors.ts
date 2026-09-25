@@ -15,10 +15,10 @@ export class ShippingRateNotFoundError extends Error {
 
   constructor(
     readonly shippingMethodId: string,
-    readonly regionCode: string,
+    readonly city: string,
   ) {
     super(
-      `Shipping rate for method ${shippingMethodId} and region ${regionCode} was not found`,
+      `Shipping rate for method ${shippingMethodId} and city ${city} was not found`,
     );
   }
 }
