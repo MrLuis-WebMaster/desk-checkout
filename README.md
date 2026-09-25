@@ -1,6 +1,6 @@
 # Checkout
 
-[![CI](https://github.com/MrLuis-WebMaster/ecommerce-wompi/actions/workflows/ci.yml/badge.svg)](https://github.com/MrLuis-WebMaster/ecommerce-wompi/actions/workflows/ci.yml)
+[![CI](https://github.com/MrLuis-WebMaster/desk-checkout/actions/workflows/ci.yml/badge.svg)](https://github.com/MrLuis-WebMaster/desk-checkout/actions/workflows/ci.yml)
 
 Catalog and checkout for desk gear priced in COP. Shoppers browse stock, pay with Wompi (card or widget), and the API/worker settle the order once.
 
