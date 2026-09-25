@@ -31,6 +31,7 @@ import {
 } from "@/modules/checkout/presentation/validation/customer-delivery.schema";
 import { createSharedCreate } from "@/modules/checkout/presentation/ensure-pending-transaction";
 import { isCreateStillCurrent } from "@/modules/checkout/presentation/pending-create-freshness";
+import { reconcileChargeTotal } from "@/modules/checkout/presentation/reconcile-charge-total";
 import type { ScreenResult } from "@/shared/application/results/screen-result";
 
 function linesFingerprint(
@@ -99,15 +100,27 @@ export function useCheckoutPage() {
 
   const cartFingerprint = computed(() => linesFingerprint(cartLines.value));
 
-  const displayLines = computed(() =>
-    cartLines.value.map((line) => ({
+  const displayLines = computed(() => {
+    const order = transaction.value;
+    if (order && order.lines.length > 0) {
+      return order.lines.map((line) => ({
+        productId: line.productId,
+        name: line.productName,
+        price: line.productPrice,
+        quantity: line.quantity,
+        imageUrl:
+          cartLines.value.find((cartLine) => cartLine.productId === line.productId)
+            ?.imageUrl ?? "",
+      }));
+    }
+    return cartLines.value.map((line) => ({
       productId: line.productId,
       name: line.name,
       price: line.price,
       quantity: line.quantity,
       imageUrl: line.imageUrl,
-    })),
-  );
+    }));
+  });
 
   const merchandiseTotal = computed(() =>
     computeMerchandiseTotal(
@@ -131,6 +144,9 @@ export function useCheckoutPage() {
   );
 
   const orderTotal = computed(() => {
+    if (transaction.value) {
+      return transaction.value.total;
+    }
     if (displayLines.value.length === 0) {
       return 0;
     }
@@ -262,12 +278,21 @@ export function useCheckoutPage() {
         message: "Payment is temporarily unavailable.",
       };
     }
+    const displayedTotal = orderTotal.value;
     try {
       const result = await pendingCreate.ensure();
       if (result.status !== "ok") {
         const message = createErrorMessage(result);
         paymentError.value = message;
         return { status: "error", message };
+      }
+      const reconciled = reconcileChargeTotal({
+        displayedTotal,
+        chargedTotal: result.value.total,
+      });
+      if (!reconciled.ok) {
+        paymentError.value = reconciled.message;
+        return { status: "error", message: reconciled.message };
       }
       return { status: "ok", transactionId: result.value.id };
     } catch {

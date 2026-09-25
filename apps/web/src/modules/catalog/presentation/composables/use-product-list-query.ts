@@ -1,7 +1,6 @@
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import {
-  blankToUndefined,
   PRODUCT_LIST_OFFSET_PAGE_MAX,
   type ListProductsQuery,
   type ProductOrder,
@@ -9,16 +8,11 @@ import {
 } from "@checkout/contracts";
 import { routeNames } from "@/app/router";
 import { toListProductsQuery } from "@/modules/catalog/presentation/mappers/catalog-route.mapper";
-
-type QueryPatch = {
-  pageSize?: string;
-  q?: string;
-  sort?: ProductSort;
-  order?: ProductOrder;
-  after?: string;
-  before?: string;
-  page?: string;
-};
+import {
+  mergeProductListQuery,
+  searchClearsIds,
+  type ProductListQueryPatch,
+} from "@/modules/catalog/presentation/mappers/product-list-query-merge";
 
 export function useProductListQuery() {
   const route = useRoute(routeNames.productList);
@@ -28,31 +22,14 @@ export function useProductListQuery() {
   const cursorMode = computed(
     () => Boolean(query.value.after || query.value.before),
   );
+  const idsMode = computed(() => Boolean(query.value.ids?.length));
 
-  function replaceQuery(patch: QueryPatch) {
-    const current = query.value;
-    const next: Record<string, string> = {};
-    const merged: QueryPatch = {
-      pageSize: String(current.pageSize),
-      q: current.q,
-      sort: current.sort,
-      order: current.order,
-      after: current.after,
-      before: current.before,
-      page: (current.page ?? 0) > 1 ? String(current.page) : undefined,
-      ...patch,
-    };
-
-    for (const [key, value] of Object.entries(merged)) {
-      if (value !== undefined && value !== "") {
-        next[key] = value;
-      }
-    }
-
+  function replaceQuery(patch: ProductListQueryPatch) {
+    const next = mergeProductListQuery(query.value, patch);
     void router.replace({ name: routeNames.productList, query: next });
   }
 
-  function replaceQueryResettingCursors(patch: QueryPatch) {
+  function replaceQueryResettingCursors(patch: ProductListQueryPatch) {
     replaceQuery({
       ...patch,
       after: undefined,
@@ -62,7 +39,7 @@ export function useProductListQuery() {
   }
 
   function setSearch(q: string) {
-    replaceQueryResettingCursors({ q: blankToUndefined(q) });
+    replaceQuery(searchClearsIds(q));
   }
 
   function setSort(sort: ProductSort) {
@@ -73,19 +50,26 @@ export function useProductListQuery() {
     replaceQueryResettingCursors({ order });
   }
 
-  function setListing(patch: Pick<QueryPatch, "q" | "sort" | "order">) {
-    replaceQueryResettingCursors(patch);
+  function setListing(patch: Pick<ProductListQueryPatch, "q" | "sort" | "order">) {
+    replaceQueryResettingCursors({
+      ...patch,
+      ...(patch.q !== undefined ? { ids: null } : {}),
+    });
   }
 
   function clearFilters() {
     replaceQueryResettingCursors({
       q: undefined,
+      ids: null,
       sort: "name",
       order: "asc",
     });
   }
 
   function goToPage(page: number) {
+    if (idsMode.value) {
+      return;
+    }
     const clamped = Math.min(
       Math.max(1, page),
       PRODUCT_LIST_OFFSET_PAGE_MAX,
@@ -98,6 +82,9 @@ export function useProductListQuery() {
   }
 
   function goAfter(cursor: string) {
+    if (idsMode.value) {
+      return;
+    }
     replaceQuery({
       after: cursor,
       before: undefined,
@@ -106,6 +93,9 @@ export function useProductListQuery() {
   }
 
   function goBefore(cursor: string) {
+    if (idsMode.value) {
+      return;
+    }
     replaceQuery({
       before: cursor,
       after: undefined,
@@ -116,6 +106,7 @@ export function useProductListQuery() {
   return {
     query,
     cursorMode,
+    idsMode,
     setSearch,
     setSort,
     setOrder,
