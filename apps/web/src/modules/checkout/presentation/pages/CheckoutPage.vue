@@ -30,7 +30,6 @@ const {
   shippingMethodId,
   errors,
   quotes,
-  baseFee,
   paymentConfig,
   transaction,
   formError,
@@ -40,10 +39,12 @@ const {
   loadingExtras,
   restoring,
   merchandiseTotal,
-  selectedQuote,
+  displayBaseFee,
+  displayDeliveryFee,
   orderTotal,
   widgetRedirectUrl,
   continueToPayment,
+  editDetails,
   onCardPaid,
 } = useCheckoutPage();
 </script>
@@ -123,13 +124,13 @@ const {
           <div class="flex justify-between gap-4">
             <dt>Base fee</dt>
             <dd class="tabular-nums">
-              {{ formatCop(baseFee) }}
+              {{ formatCop(displayBaseFee) }}
             </dd>
           </div>
           <div class="flex justify-between gap-4">
             <dt>Shipping</dt>
             <dd class="tabular-nums">
-              {{ formatCop(selectedQuote?.amount ?? 0) }}
+              {{ formatCop(displayDeliveryFee) }}
             </dd>
           </div>
           <div class="flex justify-between gap-4 font-medium text-ink">
@@ -266,6 +267,14 @@ const {
                 @paid="onCardPaid"
               />
             </div>
+            <UiButton
+              type="button"
+              variant="secondary"
+              class="mt-4 w-full"
+              @click="editDetails"
+            >
+              Edit details
+            </UiButton>
           </div>
 
           <div class="border-t border-line pt-6">
