@@ -81,21 +81,30 @@ const WORKER_ENV_KEYS = [
 ] as const;
 
 export function loadEnvironment(): void {
-  const candidates = [
-    resolve(process.cwd(), ".env"),
-    resolve(process.cwd(), "../../.env"),
-  ];
-  for (const path of candidates) {
-    if (existsSync(path)) {
-      loadDotenv({ path });
-      return;
-    }
+  const workerEnv = resolve(process.cwd(), ".env");
+  const rootEnv = resolve(process.cwd(), "../../.env");
+  if (existsSync(workerEnv)) {
+    loadDotenv({ path: workerEnv });
+    return;
+  }
+  if (existsSync(rootEnv)) {
+    loadDotenv({ path: rootEnv });
+    // Root `.env` is shared with the API (`PORT=3000`). Never inherit that for
+    // the worker — keep schema default 3001 unless WORKER_PORT is set.
+    delete process.env.PORT;
   }
 }
 
 function present(source: NodeJS.ProcessEnv): Record<string, string> {
   const values: Record<string, string> = {};
   for (const key of WORKER_ENV_KEYS) {
+    if (key === "PORT") {
+      const workerPort = source.WORKER_PORT;
+      if (workerPort !== undefined && workerPort.trim() !== "") {
+        values.PORT = workerPort;
+        continue;
+      }
+    }
     const value = source[key];
     if (value !== undefined && value.trim() !== "") {
       values[key] = value;

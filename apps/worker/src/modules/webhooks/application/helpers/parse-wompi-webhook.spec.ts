@@ -80,4 +80,16 @@ describe("parseAndValidateWompiWebhook", () => {
       },
     });
   });
+
+  it("accepts authentic events even when the timestamp is outside skew", () => {
+    const body = eventBody();
+    body.timestamp = Math.floor(Date.now() / 1000) - 3_600;
+    body.signature = {
+      ...body.signature,
+      checksum: computeWompiEventChecksum(body, SECRET),
+    };
+    expect(
+      parseAndValidateWompiWebhook(body, body.signature.checksum, config),
+    ).toMatchObject({ outcome: "ok" });
+  });
 });

@@ -71,15 +71,28 @@ export class TypeOrmTransactionReader extends TransactionReader {
     return rows.map(toAggregate);
   }
 
-  async listOrphanPending(olderThan: Date): Promise<Transaction[]> {
+  async listOrphanPending(
+    olderThan: Date,
+    options: { claimLeaseBefore: Date },
+  ): Promise<Transaction[]> {
     const rows = await this.baseQuery()
       .where("transaction.status = :status", {
         status: TransactionStatus.Pending,
       })
       .andWhere(
-        "(transaction.provider_transaction_id IS NULL OR transaction.provider_transaction_id LIKE 'claim:%')",
+        `(
+          (transaction.provider_transaction_id IS NULL AND transaction.created_at < :olderThan)
+          OR (
+            transaction.provider_transaction_id LIKE :claimPrefix
+            AND transaction.updated_at < :claimLeaseBefore
+          )
+        )`,
+        {
+          olderThan,
+          claimPrefix: "claim:%",
+          claimLeaseBefore: options.claimLeaseBefore,
+        },
       )
-      .andWhere("transaction.created_at < :olderThan", { olderThan })
       .getRawMany<TransactionRow>();
     return rows.map(toAggregate);
   }

@@ -6,6 +6,11 @@ export type PaymentSettlement = {
   stockDecremented: boolean;
 };
 
+export type ExpireUnchargedOptions = {
+  /** Only expire `claim:*` rows whose `updated_at` is before this instant. */
+  claimLeaseBefore: Date;
+};
+
 export abstract class TransactionWriter {
   abstract save(transaction: Transaction): Promise<TransactionDto>;
   abstract claimForPayment(transactionId: string): Promise<boolean>;
@@ -20,8 +25,12 @@ export abstract class TransactionWriter {
     options: { decrementStock: boolean },
   ): Promise<PaymentSettlement>;
   /**
-   * CAS: PENDING + no real provider charge → persist aggregate Expired (clears claim:*).
+   * CAS: PENDING + (null provider or stale claim) → persist aggregate Expired.
+   * Live claims (`updated_at` >= claimLeaseBefore) are not expired.
    * Returns true when this writer won the update.
    */
-  abstract expireUncharged(transaction: Transaction): Promise<boolean>;
+  abstract expireUncharged(
+    transaction: Transaction,
+    options: ExpireUnchargedOptions,
+  ): Promise<boolean>;
 }

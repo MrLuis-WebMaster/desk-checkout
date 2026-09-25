@@ -7,8 +7,14 @@ export abstract class TransactionReader {
   abstract findAggregateByProviderId(
     providerTransactionId: string,
   ): Promise<Transaction | null>;
-  /** PENDING with a real provider id older than `olderThan`. */
+  /** PENDING with a real (non-claim) provider id older than `olderThan`. */
   abstract listStuckPending(olderThan: Date): Promise<Transaction[]>;
-  /** PENDING with null or claim:* provider id older than `olderThan`. */
-  abstract listOrphanPending(olderThan: Date): Promise<Transaction[]>;
+  /**
+   * PENDING with no provider id (`created_at` before `olderThan`), or a stale
+   * `claim:*` whose row `updated_at` is before `claimLeaseBefore`.
+   */
+  abstract listOrphanPending(
+    olderThan: Date,
+    options: { claimLeaseBefore: Date },
+  ): Promise<Transaction[]>;
 }

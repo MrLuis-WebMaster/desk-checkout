@@ -60,6 +60,7 @@ describe("ExpireOrphanPendingUseCase", () => {
     writer as TransactionWriter,
     new NoopSettlementLogger(),
     1_800_000,
+    120_000,
   );
 
   beforeEach(() => {
@@ -70,17 +71,21 @@ describe("ExpireOrphanPendingUseCase", () => {
     transactions.listOrphanPending.mockResolvedValue([orphanTransaction()]);
     writer.expireUncharged.mockResolvedValue(true);
 
-    const expired = await useCase.execute(
-      new Date("2026-01-01T01:00:00.000Z"),
-    );
+    const now = new Date("2026-01-01T01:00:00.000Z");
+    const expired = await useCase.execute(now);
 
     expect(expired).toBe(1);
+    expect(transactions.listOrphanPending).toHaveBeenCalledWith(
+      new Date(now.getTime() - 1_800_000),
+      { claimLeaseBefore: new Date(now.getTime() - 120_000) },
+    );
     expect(writer.expireUncharged).toHaveBeenCalledWith(
       expect.objectContaining({
         id: orphanTransaction().id,
         status: TransactionStatus.Expired,
         providerTransactionId: null,
       }),
+      { claimLeaseBefore: new Date(now.getTime() - 120_000) },
     );
   });
 });

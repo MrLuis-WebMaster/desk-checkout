@@ -1,7 +1,6 @@
 import { mapWompiStatus } from "../../../settlement/infrastructure/wompi/map-wompi-status.js";
 import type { ValidatedWompiTransactionEvent } from "../use-cases/handle-wompi-event.use-case.js";
 import {
-  isTimestampWithinSkew,
   verifyWompiEventChecksum,
   type WompiEventPayload,
 } from "./wompi-event-checksum.js";
@@ -9,7 +8,7 @@ import {
 export type ParseWompiWebhookResult =
   | { outcome: "ok"; event: ValidatedWompiTransactionEvent }
   | { outcome: "ignored"; reason: string }
-  | { outcome: "rejected"; reason: "bad_checksum" | "skew"; statusCode: 400 };
+  | { outcome: "rejected"; reason: "bad_checksum"; statusCode: 400 };
 
 type TransactionEventData = {
   id?: string;
@@ -20,11 +19,12 @@ type TransactionEventData = {
 
 export type WompiWebhookParseConfig = {
   eventsSecret: string;
+  /** Retained for env/docs compatibility; skew no longer blocks valid signatures. */
   maxSkewSeconds: number;
   nowMs?: number;
 };
 
-/** Edge parse/validate — checksum, skew, event type, status mapping. */
+/** Edge parse/validate — checksum, event type, status mapping. */
 export function parseAndValidateWompiWebhook(
   body: unknown,
   headerChecksum: string | undefined,
@@ -40,15 +40,10 @@ export function parseAndValidateWompiWebhook(
     return { outcome: "rejected", reason: "bad_checksum", statusCode: 400 };
   }
 
-  if (
-    !isTimestampWithinSkew(
-      event.timestamp,
-      config.nowMs ?? Date.now(),
-      config.maxSkewSeconds,
-    )
-  ) {
-    return { outcome: "rejected", reason: "skew", statusCode: 400 };
-  }
+  // Authentic delayed deliveries (Wompi retries) must still settle. Checksum +
+  // idempotency are the security/dedupe controls; skew is not a hard reject.
+  void config.maxSkewSeconds;
+  void config.nowMs;
 
   if (event.event !== "transaction.updated") {
     return { outcome: "ignored", reason: "unknown_type" };

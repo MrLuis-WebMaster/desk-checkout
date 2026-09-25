@@ -29,6 +29,7 @@ export {
 export {
   TransactionWriter,
   type PaymentSettlement,
+  type ExpireUnchargedOptions,
 } from "./application/ports/transaction-writer.port.js";
 export { TransactionReader } from "./application/ports/transaction-reader.port.js";
 export {

@@ -144,7 +144,7 @@ describe("HandleWompiEventUseCase", () => {
         response: null,
         errorCode: null,
       })
-      .mockResolvedValueOnce({
+      .mockResolvedValue({
         transactionId: pendingTransaction().id,
         requestHash: "webhook:wompi_1:APPROVED",
         response: {
@@ -163,7 +163,34 @@ describe("HandleWompiEventUseCase", () => {
 
     expect(result).toEqual({ outcome: "accepted" });
     expect(writer.updateAfterPayment).not.toHaveBeenCalled();
-    expect(idempotency.find).toHaveBeenCalledTimes(3);
+  });
+
+  it("reclaims a stale nonterminal idempotency key and settles", async () => {
+    idempotency.find
+      .mockResolvedValueOnce({
+        transactionId: pendingTransaction().id,
+        requestHash: "webhook:wompi_1:APPROVED",
+        response: null,
+        errorCode: null,
+      })
+      .mockResolvedValue({
+        transactionId: pendingTransaction().id,
+        requestHash: "webhook:wompi_1:APPROVED",
+        response: null,
+        errorCode: null,
+      });
+    idempotency.begin.mockResolvedValue(undefined);
+
+    const result = await useCase.execute({
+      providerId: "wompi_1",
+      status: TransactionStatus.Approved,
+      reference: pendingTransaction().id,
+      amountInCents: 1_200_000,
+    });
+
+    expect(result).toEqual({ outcome: "accepted" });
+    expect(idempotency.abort).toHaveBeenCalledWith("webhook:wompi_1:APPROVED");
+    expect(writer.updateAfterPayment).toHaveBeenCalled();
   });
 
   it("no-ops on amount mismatch", async () => {

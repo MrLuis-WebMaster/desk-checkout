@@ -10,11 +10,16 @@ export class ExpireOrphanPendingUseCase {
     private readonly writer: TransactionWriter,
     private readonly logger: SettlementLogger,
     private readonly orphanPendingTtlMs: number,
+    /** Live payment claims newer than this lease are not expired. */
+    private readonly claimLeaseMs: number,
   ) {}
 
   async execute(now = new Date()): Promise<number> {
     const olderThan = new Date(now.getTime() - this.orphanPendingTtlMs);
-    const orphans = await this.transactions.listOrphanPending(olderThan);
+    const claimLeaseBefore = new Date(now.getTime() - this.claimLeaseMs);
+    const orphans = await this.transactions.listOrphanPending(olderThan, {
+      claimLeaseBefore,
+    });
     let expired = 0;
 
     for (const transaction of orphans) {
@@ -24,7 +29,9 @@ export class ExpireOrphanPendingUseCase {
       } catch {
         continue;
       }
-      const won = await this.writer.expireUncharged(expiredAggregate);
+      const won = await this.writer.expireUncharged(expiredAggregate, {
+        claimLeaseBefore,
+      });
       if (!won) {
         continue;
       }

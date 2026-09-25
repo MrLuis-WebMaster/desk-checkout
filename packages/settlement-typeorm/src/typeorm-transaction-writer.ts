@@ -26,6 +26,7 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
   }
 
   async claimForPayment(transactionId: string): Promise<boolean> {
+    const claimedAt = new Date();
     const result = await this.dataSource
       .getRepository(TransactionOrmEntity)
       .update(
@@ -34,7 +35,10 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
           status: TransactionStatus.Pending,
           providerTransactionId: IsNull(),
         },
-        { providerTransactionId: `claim:${transactionId}` },
+        {
+          providerTransactionId: `claim:${transactionId}`,
+          updatedAt: claimedAt,
+        },
       );
     return (result.affected ?? 0) === 1;
   }
@@ -46,7 +50,7 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
         status: TransactionStatus.Pending,
         providerTransactionId: `claim:${transactionId}`,
       },
-      { providerTransactionId: null },
+      { providerTransactionId: null, updatedAt: new Date() },
     );
   }
 
@@ -60,23 +64,33 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
         status: TransactionStatus.Pending,
         providerTransactionId: `claim:${transactionId}`,
       },
-      { providerTransactionId },
+      { providerTransactionId, updatedAt: new Date() },
     );
   }
 
-  async expireUncharged(transaction: Transaction): Promise<boolean> {
+  async expireUncharged(
+    transaction: Transaction,
+    options: { claimLeaseBefore: Date },
+  ): Promise<boolean> {
     const result = await this.dataSource
       .createQueryBuilder()
       .update(TransactionOrmEntity)
       .set({
         status: transaction.status,
         providerTransactionId: transaction.providerTransactionId,
+        updatedAt: new Date(),
       })
       .where("id = :id", { id: transaction.id })
       .andWhere("status = :status", { status: TransactionStatus.Pending })
       .andWhere(
-        "(provider_transaction_id IS NULL OR provider_transaction_id LIKE :claimPrefix)",
-        { claimPrefix: "claim:%" },
+        `(provider_transaction_id IS NULL OR (
+          provider_transaction_id LIKE :claimPrefix
+          AND updated_at < :claimLeaseBefore
+        ))`,
+        {
+          claimPrefix: "claim:%",
+          claimLeaseBefore: options.claimLeaseBefore,
+        },
       )
       .execute();
     return (result.affected ?? 0) === 1;

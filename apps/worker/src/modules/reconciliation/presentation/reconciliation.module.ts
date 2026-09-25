@@ -53,6 +53,7 @@ import { ReconciliationScheduler } from "./reconciliation.scheduler.js";
           writer,
           logger,
           env.ORPHAN_PENDING_TTL_MS,
+          env.STUCK_PENDING_AFTER_MS,
         ),
       inject: [TransactionReader, TransactionWriter, SettlementLogger],
     },
