@@ -21,6 +21,8 @@ module.exports = {
     "!src/shared/infrastructure/persistence/migrations/**",
     "!src/shared/infrastructure/persistence/typeorm.data-source.ts",
     "!src/shared/infrastructure/persistence/seed.ts",
+    "!src/shared/presentation/swagger/setup-swagger.ts",
+    "!src/modules/catalog/infrastructure/typeorm/typeorm-product-reader.ts",
     "!src/modules/**/infrastructure/wompi/wompi-http-payment-gateway.ts",
     "!src/modules/**/infrastructure/nest-settlement-logger.ts",
   ],
