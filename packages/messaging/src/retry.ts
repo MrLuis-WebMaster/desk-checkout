@@ -30,8 +30,9 @@ export class DeadLetterError extends Error {
 }
 
 /**
- * After a handler failure: publish to retry or DLQ, then ACK the original.
- * Never requeue the original message.
+ * After a handler failure: publish to retry or DLQ (with confirms), then ACK
+ * the original. Callers must only ACK after this succeeds; if publish fails,
+ * keep/requeue the original so payment events are never dropped.
  */
 export async function handleConsumerFailure(input: {
   queues: QueueTriplet;

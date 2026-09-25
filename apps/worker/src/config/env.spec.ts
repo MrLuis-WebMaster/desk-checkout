@@ -58,6 +58,35 @@ describe("parseWorkerEnv", () => {
     ).toThrow(/WOMPI_BASE_URL/);
   });
 
+  it("requires RABBITMQ_URL in production", () => {
+    expect(() =>
+      parseWorkerEnv({
+        DB_USER: "checkout",
+        DB_PASSWORD: "checkout",
+        DB_NAME: "checkout",
+        WOMPI_PUBLIC_KEY: "pub_test",
+        WOMPI_PRIVATE_KEY: "prv_test",
+        WOMPI_INTEGRITY_SECRET: "integrity",
+        NODE_ENV: "production",
+        WOMPI_BASE_URL: "https://production.wompi.co/v1",
+      }),
+    ).toThrow(/RABBITMQ_URL/);
+  });
+
+  it("defaults RABBITMQ_URL outside production when unset", () => {
+    expect(
+      parseWorkerEnv({
+        DB_USER: "checkout",
+        DB_PASSWORD: "checkout",
+        DB_NAME: "checkout",
+        WOMPI_PUBLIC_KEY: "pub_test",
+        WOMPI_PRIVATE_KEY: "prv_test",
+        WOMPI_INTEGRITY_SECRET: "integrity",
+        NODE_ENV: "development",
+      }).RABBITMQ_URL,
+    ).toBe("amqp://guest:guest@localhost:5672");
+  });
+
   it("rejects a non-http base url", () => {
     expect(() =>
       parseWorkerEnv({

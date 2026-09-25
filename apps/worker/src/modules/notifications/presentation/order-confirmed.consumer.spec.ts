@@ -5,10 +5,9 @@ import type { NotificationPort } from "../application/ports/notification.port.js
 import type { RabbitConnectionManager } from "@checkout/messaging";
 
 describe("OrderConfirmedConsumer", () => {
-  it("calls NotificationPort once for a valid order.confirmed event", async () => {
+  it("registers consume immediately and notifies on valid events", async () => {
     let handler: ((payload: unknown) => Promise<void>) | undefined;
     const rabbit = {
-      isConnected: () => true,
       consume: jest.fn(async (_queues, cb) => {
         handler = cb;
       }),
@@ -22,8 +21,9 @@ describe("OrderConfirmedConsumer", () => {
       notifications,
     );
     consumer.onModuleInit();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await Promise.resolve();
 
+    expect(rabbit.consume).toHaveBeenCalled();
     expect(handler).toBeDefined();
     await handler!({
       eventId: "e1",
@@ -45,7 +45,6 @@ describe("OrderConfirmedConsumer", () => {
   it("dead-letters unsupported versions without calling the port", async () => {
     let handler: ((payload: unknown) => Promise<void>) | undefined;
     const rabbit = {
-      isConnected: () => true,
       consume: jest.fn(async (_queues, cb) => {
         handler = cb;
       }),
@@ -59,7 +58,7 @@ describe("OrderConfirmedConsumer", () => {
       notifications,
     );
     consumer.onModuleInit();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await Promise.resolve();
 
     await expect(
       handler!({

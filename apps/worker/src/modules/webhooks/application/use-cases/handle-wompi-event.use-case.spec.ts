@@ -302,22 +302,19 @@ describe("HandleWompiEventUseCase", () => {
     });
   });
 
-  it("ignores reference-only lookup when provider truth fetch fails", async () => {
+  it("retries when reference-only lookup cannot reach the provider", async () => {
     transactions.findAggregateByProviderId.mockResolvedValue(null);
     transactions.findAggregateById.mockResolvedValue(pendingTransaction());
     gateway.getPaymentStatus.mockRejectedValue(new Error("down"));
 
-    const result = await useCase.execute({
-      providerId: "wompi_1",
-      status: TransactionStatus.Approved,
-      reference: pendingTransaction().id,
-      amountInCents: 1_200_000,
-    });
-
-    expect(result).toEqual({
-      outcome: "ignored",
-      reason: "provider_lookup_failed",
-    });
+    await expect(
+      useCase.execute({
+        providerId: "wompi_1",
+        status: TransactionStatus.Approved,
+        reference: pendingTransaction().id,
+        amountInCents: 1_200_000,
+      }),
+    ).rejects.toThrow(/provider_lookup_failed/);
     expect(writer.updateAfterPayment).not.toHaveBeenCalled();
   });
 

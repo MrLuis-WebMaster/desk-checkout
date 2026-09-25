@@ -57,8 +57,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      # Do not block API boot on Rabbit — webhook publish degrades to 503 and
+      # reconnects in the background (see WebhooksModule / RabbitConnectionManager).
     # Single instance: TypeORM migration:run is not safe under concurrent replicas.
     # In-memory throttler is also per-process — keep one API replica in Coolify unless Redis is added.
 

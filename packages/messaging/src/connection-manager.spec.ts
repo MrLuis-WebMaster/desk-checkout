@@ -135,4 +135,43 @@ describe("RabbitConnectionManager", () => {
 
     await manager.stop();
   });
+
+  it("requeues the original when retry/DLQ publish fails", async () => {
+    const socket = createFakeSocket();
+    connectMock.mockResolvedValue(socket.connection as never);
+    socket.channel.waitForConfirms.mockRejectedValue(new Error("confirm lost"));
+
+    const manager = new RabbitConnectionManager({
+      url: "amqp://localhost:5672",
+      reconnectDelayMs: 60_000,
+      queues: [PAYMENT_EVENTS_QUEUES],
+      logger: { info: jest.fn(), error: jest.fn() },
+    });
+    manager.start();
+    await waitFor(() => manager.isConnected());
+
+    await manager.consume(PAYMENT_EVENTS_QUEUES, async () => {
+      throw new Error("handler boom");
+    });
+
+    const consumeCb = socket.channel.consume.mock.calls[0]?.[1] as (
+      message: {
+        content: Buffer;
+        properties: { headers?: Record<string, unknown> };
+      } | null,
+    ) => void;
+    expect(typeof consumeCb).toBe("function");
+
+    const message = {
+      content: Buffer.from('{"payment":true}'),
+      properties: { headers: {} },
+    };
+    consumeCb(message);
+
+    await waitFor(() => socket.channel.nack.mock.calls.length > 0);
+    expect(socket.channel.nack).toHaveBeenCalledWith(message, false, true);
+    expect(socket.channel.ack).not.toHaveBeenCalled();
+
+    await manager.stop();
+  });
 });

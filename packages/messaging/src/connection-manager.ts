@@ -234,11 +234,15 @@ export class RabbitConnectionManager {
               ? retryError.message
               : String(retryError),
         });
+        // Retry/DLQ publish did not confirm. Never nack(requeue=false) here —
+        // the main queue has no DLX, so that would drop the only copy (bad for
+        // payments). Requeue so Rabbit redelivers; handlers are idempotent.
         try {
-          channel.nack(message, false, false);
+          channel.nack(message, false, true);
         } catch {
-          // channel may already be closed
+          // Channel may already be closed; broker will redeliver unacked msgs.
         }
+        this.recoverChannel(channel);
       }
     }
   }
@@ -300,6 +304,27 @@ export class RabbitConnectionManager {
   private clearSocket(): void {
     this.channel = null;
     this.connection = null;
+  }
+
+  /** Drop a broken socket and reconnect so consumers rebind. */
+  private recoverChannel(channel: ConfirmChannel): void {
+    const connection = this.connection;
+    if (this.channel === channel) {
+      this.clearSocket();
+    }
+    void (async () => {
+      try {
+        await channel.close();
+      } catch {
+        // ignore
+      }
+      try {
+        await connection?.close();
+      } catch {
+        // ignore
+      }
+    })();
+    this.scheduleReconnect();
   }
 
   private scheduleReconnect(): void {

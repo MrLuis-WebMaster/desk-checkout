@@ -63,13 +63,17 @@ export class HandleWompiEventUseCase {
         let providerTruth: ProviderPayment;
         try {
           providerTruth = await this.gateway.getPaymentStatus(providerId);
-        } catch {
-          this.logger.log("webhook_accepted", {
+        } catch (error) {
+          // Transient Wompi/API failure — must not ACK. Let Rabbit retry.
+          this.logger.log("webhook_retryable", {
             reason: "provider_lookup_failed",
             providerId,
             reference,
+            error: error instanceof Error ? error.message : String(error),
           });
-          return { outcome: "ignored", reason: "provider_lookup_failed" };
+          throw new Error(
+            `provider_lookup_failed:${providerId}:${error instanceof Error ? error.message : String(error)}`,
+          );
         }
         if (!providerPaymentMatchesTransaction(providerTruth, byReference)) {
           this.logger.log("webhook_accepted", {
