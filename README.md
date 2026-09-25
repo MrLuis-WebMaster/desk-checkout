@@ -79,4 +79,4 @@ Manual checks after `pnpm dev`:
 3. Create order → Other methods (widget) → complete in-widget → result page syncs.
 4. Zero stock on a line → Continue to payment shows out-of-stock copy that invites updating the cart (not a generic create error).
 5. Edit details on the payment step → returns to Details with cart kept (server may still hold a PENDING orphan until Phase 6).
-6. If pay/sync returns out of stock after a provider charge, the UI must say not to retry (support), never “try again”.
+6. If pay/sync returns out of stock after a provider charge, the UI must say not to retry, show the order id, and point to support.

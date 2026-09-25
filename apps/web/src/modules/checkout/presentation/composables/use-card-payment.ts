@@ -17,7 +17,7 @@ import {
   formatCardNumber,
 } from "@/modules/checkout/infrastructure/card-number";
 import { finalizeCheckout } from "@/modules/checkout/presentation/composables/finalize-checkout";
-import { POST_CHARGE_OUT_OF_STOCK_MESSAGE } from "@/shared/application/messages/stock-messages";
+import { postChargeOutOfStockMessage } from "@/shared/application/messages/stock-messages";
 import {
   cardPaymentSchema,
   type CardPaymentValues,
@@ -121,7 +121,9 @@ export function useCardPayment(options: {
       );
       if (result.status !== "ok") {
         if (result.status === "out_of_stock") {
-          errorMessage.value = POST_CHARGE_OUT_OF_STOCK_MESSAGE;
+          errorMessage.value = postChargeOutOfStockMessage(
+            options.transactionId(),
+          );
           return;
         }
         errorMessage.value =

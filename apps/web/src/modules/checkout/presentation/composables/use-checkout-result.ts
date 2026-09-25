@@ -13,7 +13,7 @@ import {
   syncProviderPayment,
 } from "@/modules/checkout/composition";
 import { finalizeCheckout } from "@/modules/checkout/presentation/composables/finalize-checkout";
-import { POST_CHARGE_OUT_OF_STOCK_MESSAGE } from "@/shared/application/messages/stock-messages";
+import { postChargeOutOfStockMessage } from "@/shared/application/messages/stock-messages";
 
 type ResultTone = "ok" | "danger" | "wait";
 
@@ -94,7 +94,7 @@ export function useCheckoutResult() {
           return;
         }
         if (synced.status === "out_of_stock") {
-          errorMessage.value = POST_CHARGE_OUT_OF_STOCK_MESSAGE;
+          errorMessage.value = postChargeOutOfStockMessage(transactionId);
           return;
         }
         errorMessage.value =
