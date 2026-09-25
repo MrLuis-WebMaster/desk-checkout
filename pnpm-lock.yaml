@@ -221,6 +221,21 @@ importers:
       '@checkout/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@swc/core':
+        specifier: 1.16.2
+        version: 1.16.2
+      '@swc/jest':
+        specifier: 0.2.39
+        version: 0.2.39(@swc/core@1.16.2)
+      '@types/jest':
+        specifier: 29.5.14
+        version: 29.5.14
+      '@types/node':
+        specifier: 22.19.0
+        version: 22.19.0
+      jest:
+        specifier: 29.7.0
+        version: 29.7.0(@types/node@22.19.0)
       typescript:
         specifier: 7.0.2
         version: 7.0.2
@@ -271,9 +286,21 @@ importers:
       '@checkout/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@swc/core':
+        specifier: 1.16.2
+        version: 1.16.2
+      '@swc/jest':
+        specifier: 0.2.39
+        version: 0.2.39(@swc/core@1.16.2)
+      '@types/jest':
+        specifier: 29.5.14
+        version: 29.5.14
       '@types/node':
         specifier: 22.19.0
         version: 22.19.0
+      jest:
+        specifier: 29.7.0
+        version: 29.7.0(@types/node@22.19.0)
       typescript:
         specifier: 7.0.2
         version: 7.0.2

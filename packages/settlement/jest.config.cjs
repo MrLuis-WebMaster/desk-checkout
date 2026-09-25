@@ -5,6 +5,24 @@ module.exports = {
   testMatch: ["**/*.spec.ts"],
   moduleFileExtensions: ["ts", "js", "json"],
   clearMocks: true,
+  collectCoverageFrom: [
+    "src/domain/**/*.ts",
+    "src/application/**/*.ts",
+    "!src/**/*.spec.ts",
+    "!src/__tests__/**",
+  ],
+  coveragePathIgnorePatterns: [
+    "/node_modules/",
+    "\\.spec\\.ts$",
+    "\\.test\\.ts$",
+    "main\\.ts$",
+    "\\.module\\.ts$",
+    "\\.orm-entity\\.ts$",
+    "/migrations/",
+    "data-source\\.ts$",
+    "index\\.ts$",
+  ],
+  coverageReporters: ["text", "text-summary"],
   transform: {
     "^.+\\.(t|j)sx?$": [
       "@swc/jest",

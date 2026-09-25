@@ -5,17 +5,8 @@ module.exports = {
   testMatch: ["**/*.spec.ts"],
   moduleFileExtensions: ["ts", "js", "json"],
   clearMocks: true,
-  setupFiles: ["<rootDir>/jest.setup.cjs"],
-  collectCoverageFrom: [
-    "src/modules/**/application/**/*.ts",
-    "src/modules/**/presentation/**/*.ts",
-    "src/modules/settlement/infrastructure/**/*.ts",
-    "src/config/**/*.ts",
-    "!src/**/*.spec.ts",
-    "!src/**/*.module.ts",
-    "!src/main.ts",
-    "!src/modules/settlement/infrastructure/wompi/wompi-http-payment-gateway.ts",
-  ],
+  passWithNoTests: true,
+  collectCoverageFrom: ["src/**/*.ts", "!src/index.ts"],
   coveragePathIgnorePatterns: [
     "/node_modules/",
     "\\.spec\\.ts$",
@@ -33,17 +24,13 @@ module.exports = {
       "@swc/jest",
       {
         jsc: {
-          parser: { syntax: "typescript", decorators: true },
-          transform: { legacyDecorator: true, decoratorMetadata: true },
+          parser: { syntax: "typescript" },
           target: "es2022",
         },
         module: { type: "commonjs" },
       },
     ],
   },
-  transformIgnorePatterns: [
-    "/node_modules/(?!(?:\\.pnpm/[^/]+/node_modules/)?(@nestjs|@checkout)/)",
-  ],
   moduleNameMapper: {
     "^(\\.{1,2}/.*)\\.js$": "$1",
   },
