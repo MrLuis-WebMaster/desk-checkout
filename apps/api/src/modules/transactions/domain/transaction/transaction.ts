@@ -4,6 +4,7 @@ import {
   type ShippingRegionCode,
 } from "@checkout/contracts";
 import { Money } from "#shared/domain/money.js";
+import { InvalidTransactionStateError } from "./errors.js";
 
 export type TransactionCustomer = {
   fullName: string;
@@ -32,6 +33,7 @@ export class Transaction {
     readonly customer: TransactionCustomer,
     readonly delivery: TransactionDelivery,
     readonly createdAt: Date,
+    readonly providerTransactionId: string | null,
   ) {}
 
   static createPending(props: {
@@ -60,6 +62,83 @@ export class Transaction {
       props.customer,
       props.delivery,
       new Date(),
+      null,
+    );
+  }
+
+  static rehydrate(props: {
+    id: string;
+    status: TransactionStatus;
+    productId: string;
+    productName: string;
+    productPrice: Money;
+    baseFee: Money;
+    deliveryFee: Money;
+    total: Money;
+    customer: TransactionCustomer;
+    delivery: TransactionDelivery;
+    createdAt: Date;
+    providerTransactionId: string | null;
+  }): Transaction {
+    return new Transaction(
+      props.id,
+      props.status,
+      props.productId,
+      props.productName,
+      props.productPrice,
+      props.baseFee,
+      props.deliveryFee,
+      props.total,
+      props.customer,
+      props.delivery,
+      props.createdAt,
+      props.providerTransactionId,
+    );
+  }
+
+  canStartPayment(): boolean {
+    return (
+      this.status === TransactionStatus.Pending &&
+      this.providerTransactionId === null
+    );
+  }
+
+  hasProviderCharge(): boolean {
+    return (
+      this.providerTransactionId !== null &&
+      !this.providerTransactionId.startsWith("claim:")
+    );
+  }
+
+  applyProviderResult(
+    providerTransactionId: string,
+    status: TransactionStatus,
+  ): Transaction {
+    if (this.hasProviderCharge()) {
+      if (
+        this.providerTransactionId === providerTransactionId &&
+        this.status === status
+      ) {
+        return this;
+      }
+      throw new InvalidTransactionStateError();
+    }
+    if (this.status !== TransactionStatus.Pending) {
+      throw new InvalidTransactionStateError();
+    }
+    return new Transaction(
+      this.id,
+      status,
+      this.productId,
+      this.productName,
+      this.productPrice,
+      this.baseFee,
+      this.deliveryFee,
+      this.total,
+      this.customer,
+      this.delivery,
+      this.createdAt,
+      providerTransactionId,
     );
   }
 }

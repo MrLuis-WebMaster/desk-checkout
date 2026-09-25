@@ -3,10 +3,14 @@ import {
   IsDefined,
   IsEmail,
   IsIn,
+  IsInt,
   IsNotEmpty,
+  IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
+  Min,
   ValidateNested,
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
@@ -14,6 +18,7 @@ import {
   SHIPPING_REGION_CODES,
   TransactionStatus,
   type CreateTransactionRequest,
+  type PayTransactionRequest,
   type ShippingRegionCode,
   type TransactionDto,
 } from "@checkout/contracts";
@@ -90,6 +95,33 @@ export class CreateTransactionDto implements CreateTransactionRequest {
   @ValidateNested()
   @Type(() => CreateTransactionDeliveryDto)
   delivery!: CreateTransactionDeliveryDto;
+}
+
+export class PayTransactionDto implements PayTransactionRequest {
+  @ApiProperty()
+  @Transform(trimString)
+  @IsString()
+  @IsNotEmpty()
+  paymentMethodToken!: string;
+
+  @ApiProperty()
+  @Transform(trimString)
+  @IsString()
+  @IsNotEmpty()
+  acceptanceToken!: string;
+
+  @ApiProperty()
+  @Transform(trimString)
+  @IsString()
+  @IsNotEmpty()
+  acceptPersonalAuth!: string;
+
+  @ApiProperty({ required: false, default: 1, minimum: 1, maximum: 36 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(36)
+  installments?: number;
 }
 
 export class TransactionParamsDto {

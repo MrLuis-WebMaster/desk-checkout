@@ -6,12 +6,18 @@ describe("parseApiEnv", () => {
     DB_PASSWORD: "checkout",
     DB_NAME: "checkout",
   };
+  const wompi = {
+    WOMPI_PUBLIC_KEY: "pub_test",
+    WOMPI_PRIVATE_KEY: "prv_test",
+    WOMPI_INTEGRITY_SECRET: "integrity",
+  };
 
   it("applies host/port defaults when variables are missing", () => {
     expect(
       parseApiEnv({
         CORS_ORIGIN: "http://localhost:5173",
         ...db,
+        ...wompi,
       }),
     ).toEqual({
       PORT: 3000,
@@ -22,6 +28,8 @@ describe("parseApiEnv", () => {
       DB_PASSWORD: "checkout",
       DB_NAME: "checkout",
       NODE_ENV: "development",
+      WOMPI_BASE_URL: "https://sandbox.wompi.co/v1",
+      ...wompi,
     });
   });
 
@@ -46,6 +54,8 @@ describe("parseApiEnv", () => {
         DB_PASSWORD: "secret",
         DB_NAME: "shop",
         NODE_ENV: "production",
+        WOMPI_BASE_URL: "https://production.wompi.co/v1",
+        ...wompi,
       }),
     ).toEqual({
       PORT: 4000,
@@ -56,7 +66,36 @@ describe("parseApiEnv", () => {
       DB_PASSWORD: "secret",
       DB_NAME: "shop",
       NODE_ENV: "production",
+      WOMPI_BASE_URL: "https://production.wompi.co/v1",
+      ...wompi,
     });
+  });
+
+  it("requires the Wompi base URL in production", () => {
+    expect(() =>
+      parseApiEnv({
+        CORS_ORIGIN: "http://localhost:5173",
+        NODE_ENV: "production",
+        ...db,
+        ...wompi,
+      }),
+    ).toThrow(/WOMPI_BASE_URL/);
+  });
+
+  it("requires Wompi keys outside test", () => {
+    expect(() =>
+      parseApiEnv({ CORS_ORIGIN: "http://localhost:5173", ...db }),
+    ).toThrow(/WOMPI_/);
+  });
+
+  it("allows empty Wompi keys when NODE_ENV is test", () => {
+    expect(
+      parseApiEnv({
+        CORS_ORIGIN: "http://localhost:5173",
+        NODE_ENV: "test",
+        ...db,
+      }).WOMPI_PUBLIC_KEY,
+    ).toBe("");
   });
 
   it("rejects an invalid port", () => {

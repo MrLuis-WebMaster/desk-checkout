@@ -5,6 +5,7 @@ import { ApiErrorCode, TransactionStatus } from "@checkout/contracts";
 import { err, ok } from "#shared/result/result.js";
 import { CreateTransactionUseCase } from "../../application/use-cases/create-transaction.use-case.js";
 import { GetTransactionUseCase } from "../../application/use-cases/get-transaction.use-case.js";
+import { PayTransactionUseCase } from "../../application/use-cases/pay-transaction.use-case.js";
 import {
   OutOfStockError,
   TransactionNotFoundError,
@@ -15,6 +16,7 @@ import { TransactionsController } from "./transactions.controller.js";
 describe("TransactionsController", () => {
   const createTransaction = { execute: jest.fn() };
   const getTransaction = { execute: jest.fn() };
+  const payTransaction = { execute: jest.fn() };
   let controller: TransactionsController;
 
   beforeEach(async () => {
@@ -23,6 +25,7 @@ describe("TransactionsController", () => {
       providers: [
         { provide: CreateTransactionUseCase, useValue: createTransaction },
         { provide: GetTransactionUseCase, useValue: getTransaction },
+        { provide: PayTransactionUseCase, useValue: payTransaction },
       ],
     }).compile();
     controller = moduleRef.get(TransactionsController);

@@ -13,6 +13,9 @@ export const ApiErrorCode = {
   ShippingMethodNotFound: "SHIPPING_METHOD_NOT_FOUND",
   CheckoutSettingsNotFound: "CHECKOUT_SETTINGS_NOT_FOUND",
   TransactionNotFound: "TRANSACTION_NOT_FOUND",
+  PaymentFailed: "PAYMENT_FAILED",
+  InvalidTransactionState: "INVALID_TRANSACTION_STATE",
+  IdempotencyConflict: "IDEMPOTENCY_CONFLICT",
   RouteNotFound: "ROUTE_NOT_FOUND",
   Unexpected: "UNEXPECTED",
 } as const;
@@ -184,6 +187,21 @@ export type CreateTransactionRequest = {
   productId: string;
   customer: TransactionCustomerDto;
   delivery: TransactionDeliveryDto;
+};
+
+export type PaymentConfigDto = {
+  publicKey: string;
+  acceptanceToken: string;
+  acceptanceTokenType: string;
+  acceptPersonalAuth: string;
+  acceptPersonalAuthType: string;
+};
+
+export type PayTransactionRequest = {
+  paymentMethodToken: string;
+  acceptanceToken: string;
+  acceptPersonalAuth: string;
+  installments?: number;
 };
 
 export type TransactionDto = {

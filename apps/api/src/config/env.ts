@@ -25,6 +25,44 @@ export const apiEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
+  WOMPI_BASE_URL: z.string().default(""),
+  WOMPI_PUBLIC_KEY: z.string().default(""),
+  WOMPI_PRIVATE_KEY: z.string().default(""),
+  WOMPI_INTEGRITY_SECRET: z.string().default(""),
+}).superRefine((value, ctx) => {
+  if (value.NODE_ENV === "test") {
+    return;
+  }
+  const required = [
+    "WOMPI_PUBLIC_KEY",
+    "WOMPI_PRIVATE_KEY",
+    "WOMPI_INTEGRITY_SECRET",
+  ] as const;
+  if (value.NODE_ENV === "production" && value.WOMPI_BASE_URL.trim().length === 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["WOMPI_BASE_URL"],
+      message: "Required",
+    });
+  } else if (
+    value.WOMPI_BASE_URL.trim().length > 0 &&
+    !/^https?:\/\//.test(value.WOMPI_BASE_URL)
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["WOMPI_BASE_URL"],
+      message: "Must be an http(s) URL",
+    });
+  }
+  for (const key of required) {
+    if (value[key].trim().length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: [key],
+        message: "Required",
+      });
+    }
+  }
 });
 
 export type ApiEnv = z.infer<typeof apiEnvSchema>;
@@ -38,6 +76,10 @@ const API_ENV_KEYS = [
   "DB_PASSWORD",
   "DB_NAME",
   "NODE_ENV",
+  "WOMPI_BASE_URL",
+  "WOMPI_PUBLIC_KEY",
+  "WOMPI_PRIVATE_KEY",
+  "WOMPI_INTEGRITY_SECRET",
 ] as const;
 
 export function loadEnvironment(): void {
@@ -72,7 +114,11 @@ export function parseApiEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
       .join("\n");
     throw new Error(`Invalid API environment:\n${details}`);
   }
-  return parsed.data;
+  const data = parsed.data;
+  if (data.NODE_ENV !== "production" && data.WOMPI_BASE_URL.trim().length === 0) {
+    return { ...data, WOMPI_BASE_URL: "https://sandbox.wompi.co/v1" };
+  }
+  return data;
 }
 
 loadEnvironment();
