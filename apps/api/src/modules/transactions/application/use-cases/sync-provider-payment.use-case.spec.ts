@@ -250,4 +250,207 @@ describe("SyncProviderPaymentUseCase", () => {
     }
     expect(idempotency.abort).toHaveBeenCalledWith("key-5");
   });
+
+  it("replays a stored idempotent response", async () => {
+    const { createHash } = await import("node:crypto");
+    const requestHash = createHash("sha256")
+      .update(JSON.stringify({ providerTransactionId: "wompi_1" }))
+      .digest("hex");
+    const dto = {
+      id: pendingTransaction().id,
+      status: TransactionStatus.Approved,
+    };
+    idempotency.find.mockResolvedValue({
+      transactionId: pendingTransaction().id,
+      requestHash,
+      response: dto,
+      errorCode: null,
+    });
+
+    const result = await useCase.execute(
+      pendingTransaction().id,
+      "key-replay",
+      syncRequest,
+    );
+
+    expect(result).toEqual({ ok: true, value: dto });
+    expect(idempotency.begin).not.toHaveBeenCalled();
+    expect(gateway.getPaymentStatus).not.toHaveBeenCalled();
+  });
+
+  it("replays out-of-stock from the idempotency store", async () => {
+    const { createHash } = await import("node:crypto");
+    const requestHash = createHash("sha256")
+      .update(JSON.stringify({ providerTransactionId: "wompi_1" }))
+      .digest("hex");
+    idempotency.find.mockResolvedValue({
+      transactionId: pendingTransaction().id,
+      requestHash,
+      response: null,
+      errorCode: "OUT_OF_STOCK",
+    });
+
+    const result = await useCase.execute(
+      pendingTransaction().id,
+      "key-oos",
+      syncRequest,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("OUT_OF_STOCK");
+    }
+  });
+
+  it("rejects an idempotency key reused with a different body", async () => {
+    idempotency.find.mockResolvedValue({
+      transactionId: pendingTransaction().id,
+      requestHash: "other-hash",
+      response: null,
+      errorCode: null,
+    });
+
+    const result = await useCase.execute(
+      pendingTransaction().id,
+      "key-body",
+      syncRequest,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("IDEMPOTENCY_CONFLICT");
+    }
+  });
+
+  it("rejects an idempotency key reused for a different transaction", async () => {
+    const { createHash } = await import("node:crypto");
+    const requestHash = createHash("sha256")
+      .update(JSON.stringify({ providerTransactionId: "wompi_1" }))
+      .digest("hex");
+    idempotency.find.mockResolvedValue({
+      transactionId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      requestHash,
+      response: { id: "other", status: TransactionStatus.Approved },
+      errorCode: null,
+    });
+
+    const result = await useCase.execute(
+      pendingTransaction().id,
+      "key-tx",
+      syncRequest,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("IDEMPOTENCY_CONFLICT");
+    }
+  });
+
+  it("rejects an in-progress idempotency record without a response", async () => {
+    const { createHash } = await import("node:crypto");
+    const requestHash = createHash("sha256")
+      .update(JSON.stringify({ providerTransactionId: "wompi_1" }))
+      .digest("hex");
+    idempotency.find.mockResolvedValue({
+      transactionId: pendingTransaction().id,
+      requestHash,
+      response: null,
+      errorCode: null,
+    });
+
+    const result = await useCase.execute(
+      pendingTransaction().id,
+      "key-inflight",
+      syncRequest,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("IDEMPOTENCY_CONFLICT");
+    }
+  });
+
+  it("maps begin conflicts to IdempotencyConflictError", async () => {
+    const { IdempotencyConflictError } = await import(
+      "../../domain/transaction/errors.js"
+    );
+    idempotency.begin.mockRejectedValue(new IdempotencyConflictError());
+
+    const result = await useCase.execute(
+      pendingTransaction().id,
+      "key-begin",
+      syncRequest,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("IDEMPOTENCY_CONFLICT");
+    }
+  });
+
+  it("rethrows unexpected begin errors", async () => {
+    idempotency.begin.mockRejectedValue(new Error("db down"));
+    await expect(
+      useCase.execute(pendingTransaction().id, "key-throw", syncRequest),
+    ).rejects.toThrow("db down");
+  });
+
+  it("fails when the transaction is missing", async () => {
+    transactions.findAggregateById.mockResolvedValue(null);
+
+    const result = await useCase.execute(
+      pendingTransaction().id,
+      "key-missing",
+      syncRequest,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("TRANSACTION_NOT_FOUND");
+    }
+    expect(idempotency.abort).toHaveBeenCalledWith("key-missing");
+  });
+
+  it("fails when a terminal charge dto disappears", async () => {
+    const approved = pendingTransaction().applyProviderResult(
+      "wompi_1",
+      TransactionStatus.Approved,
+    );
+    transactions.findAggregateById.mockResolvedValue(approved);
+    transactions.findById.mockResolvedValue(null);
+
+    const result = await useCase.execute(approved.id, "key-gone", syncRequest);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("TRANSACTION_NOT_FOUND");
+    }
+    expect(idempotency.abort).toHaveBeenCalledWith("key-gone");
+  });
+
+  it("rejects a foreign provider transaction id", async () => {
+    const pending = pendingTransaction();
+    const charged = Transaction.rehydrate({
+      id: pending.id,
+      status: TransactionStatus.Pending,
+      lines: pending.lines,
+      baseFee: pending.baseFee,
+      deliveryFee: pending.deliveryFee,
+      total: pending.total,
+      customer: pending.customer,
+      delivery: pending.delivery,
+      createdAt: pending.createdAt,
+      providerTransactionId: "wompi_other",
+    });
+    transactions.findAggregateById.mockResolvedValue(charged);
+
+    const result = await useCase.execute(charged.id, "key-foreign", syncRequest);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("INVALID_TRANSACTION_STATE");
+    }
+    expect(idempotency.abort).toHaveBeenCalledWith("key-foreign");
+    expect(gateway.getPaymentStatus).not.toHaveBeenCalled();
+  });
 });

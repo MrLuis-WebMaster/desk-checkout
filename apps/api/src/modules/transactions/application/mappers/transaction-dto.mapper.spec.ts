@@ -33,11 +33,26 @@ describe("toTransactionDto", () => {
       providerTransactionId: null,
     });
 
-    expect(toTransactionDto(transaction)).toMatchObject({
+    expect(toTransactionDto(transaction)).toEqual({
       id: transaction.id,
       status: TransactionStatus.Pending,
+      productId: transaction.productId,
+      productName: transaction.productName,
       productPrice: 10000,
+      quantity: 1,
+      lines: [
+        {
+          productId: "11111111-1111-4111-8111-111111111111",
+          productName: "Lamp",
+          productPrice: 10000,
+          quantity: 1,
+        },
+      ],
+      baseFee: 500,
+      deliveryFee: 1500,
       total: 12000,
+      customer: transaction.customer,
+      delivery: transaction.delivery,
       createdAt: "2026-01-01T00:00:00.000Z",
     });
   });

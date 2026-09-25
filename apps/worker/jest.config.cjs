@@ -14,7 +14,6 @@ module.exports = {
     "!src/**/*.spec.ts",
     "!src/**/*.module.ts",
     "!src/main.ts",
-    "!src/modules/settlement/infrastructure/wompi/wompi-http-payment-gateway.ts",
     "!src/modules/reconciliation/presentation/reconciliation.scheduler.ts",
   ],
   coveragePathIgnorePatterns: [

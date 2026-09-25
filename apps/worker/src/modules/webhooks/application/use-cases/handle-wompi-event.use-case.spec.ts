@@ -301,4 +301,83 @@ describe("HandleWompiEventUseCase", () => {
       reason: "transaction_not_found",
     });
   });
+
+  it("ignores reference-only lookup when provider truth fetch fails", async () => {
+    transactions.findAggregateByProviderId.mockResolvedValue(null);
+    transactions.findAggregateById.mockResolvedValue(pendingTransaction());
+    gateway.getPaymentStatus.mockRejectedValue(new Error("down"));
+
+    const result = await useCase.execute({
+      providerId: "wompi_1",
+      status: TransactionStatus.Approved,
+      reference: pendingTransaction().id,
+      amountInCents: 1_200_000,
+    });
+
+    expect(result).toEqual({
+      outcome: "ignored",
+      reason: "provider_lookup_failed",
+    });
+    expect(writer.updateAfterPayment).not.toHaveBeenCalled();
+  });
+
+  it("ignores reference-only lookup when the order already has another provider", async () => {
+    const bound = Transaction.rehydrate({
+      id: pendingTransaction().id,
+      status: TransactionStatus.Pending,
+      lines: pendingTransaction().lines,
+      baseFee: pendingTransaction().baseFee,
+      deliveryFee: pendingTransaction().deliveryFee,
+      total: pendingTransaction().total,
+      customer: pendingTransaction().customer,
+      delivery: pendingTransaction().delivery,
+      createdAt: pendingTransaction().createdAt,
+      providerTransactionId: "wompi_other",
+    });
+    transactions.findAggregateByProviderId.mockResolvedValue(null);
+    transactions.findAggregateById.mockResolvedValue(bound);
+    gateway.getPaymentStatus.mockResolvedValue({
+      providerTransactionId: "wompi_1",
+      status: TransactionStatus.Approved,
+      reference: bound.id,
+      amountInCents: 1_200_000,
+    });
+
+    const result = await useCase.execute({
+      providerId: "wompi_1",
+      status: TransactionStatus.Approved,
+      reference: bound.id,
+      amountInCents: 1_200_000,
+    });
+
+    expect(result).toEqual({
+      outcome: "ignored",
+      reason: "provider_mismatch",
+    });
+    expect(writer.updateAfterPayment).not.toHaveBeenCalled();
+  });
+
+  it("throws when reclaim loses the idempotency race", async () => {
+    const { IdempotencyConflictError } = await import("@checkout/settlement");
+    idempotency.begin
+      .mockRejectedValueOnce(new IdempotencyConflictError())
+      .mockRejectedValueOnce(new IdempotencyConflictError());
+    // After begin conflict: wait loop finds nonterminal then stays pending
+    idempotency.find.mockResolvedValue({
+      transactionId: pendingTransaction().id,
+      requestHash: "webhook:wompi_1:APPROVED",
+      response: null,
+      errorCode: null,
+    });
+
+    await expect(
+      useCase.execute({
+        providerId: "wompi_1",
+        status: TransactionStatus.Approved,
+        reference: pendingTransaction().id,
+        amountInCents: 1_200_000,
+      }),
+    ).rejects.toThrow(/webhook_idempotency_in_flight/);
+    expect(idempotency.abort).toHaveBeenCalledWith("webhook:wompi_1:APPROVED");
+  });
 });

@@ -59,5 +59,20 @@ describe("TypeOrmFeeCatalog", () => {
     await expect(catalog.listQuotes("BOG")).resolves.toEqual([
       { id: "m1", code: "STD", name: "Standard", amount: 1500 },
     ]);
+    expect(methods.createQueryBuilder).toHaveBeenCalledWith("method");
+    expect(qb.innerJoin).toHaveBeenCalledWith(
+      "shipping_rates",
+      "rate",
+      "rate.shipping_method_id = method.id AND rate.region_code = :city",
+      { city: "BOG" },
+    );
+    expect(qb.select).toHaveBeenCalledWith([
+      "method.id AS id",
+      "method.code AS code",
+      "method.name AS name",
+      'rate.amount_cents AS "amount"',
+    ]);
+    expect(qb.where).toHaveBeenCalledWith("method.active = true");
+    expect(qb.orderBy).toHaveBeenCalledWith("rate.amount_cents", "ASC");
   });
 });
