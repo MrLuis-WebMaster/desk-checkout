@@ -17,8 +17,11 @@ function httpsRedirectUrl(url: string): string | undefined {
 }
 
 export function useWompiWidget(options: {
-  transactionId: () => string;
-  redirectUrl: () => string;
+  resolveTransactionId: () => Promise<
+    | { status: "ok"; transactionId: string }
+    | { status: "error"; message: string }
+  >;
+  redirectUrl: (transactionId: string) => string;
   customerEmail?: () => string | undefined;
   customerFullName?: () => string | undefined;
   customerPhone?: () => string | undefined;
@@ -31,7 +34,14 @@ export function useWompiWidget(options: {
     errorMessage.value = "";
     loading.value = true;
     try {
-      const session = await getWidgetSession(options.transactionId());
+      const resolved = await options.resolveTransactionId();
+      if (resolved.status !== "ok") {
+        errorMessage.value = resolved.message;
+        return;
+      }
+      const transactionId = resolved.transactionId;
+
+      const session = await getWidgetSession(transactionId);
       if (session.status !== "ok") {
         errorMessage.value =
           session.status === "not_found"
@@ -47,7 +57,7 @@ export function useWompiWidget(options: {
           reference: session.value.reference,
           publicKey: session.value.publicKey,
           signature: { integrity: session.value.signature },
-          redirectUrl: httpsRedirectUrl(options.redirectUrl()),
+          redirectUrl: httpsRedirectUrl(options.redirectUrl(transactionId)),
           customerData: {
             email: options.customerEmail?.(),
             fullName: options.customerFullName?.(),
@@ -63,7 +73,7 @@ export function useWompiWidget(options: {
           // Cart/pending cleanup happens on the result page via finalizeCheckout.
           void router.push({
             name: routeNames.checkoutResult,
-            params: { transactionId: options.transactionId() },
+            params: { transactionId },
             query: { id: providerId },
           });
         },

@@ -48,7 +48,7 @@ export class ProductsController {
     if (!result.ok) {
       throwApiError(
         ApiErrorCode.ValidationError,
-        "Invalid list query: use either page or after/before, not both",
+        "Invalid list query: ids cannot mix with after/before/page/q; use either page or after/before, not both",
         HttpStatus.BAD_REQUEST,
       );
     }

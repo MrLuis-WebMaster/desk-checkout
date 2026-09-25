@@ -33,6 +33,7 @@ const {
   paymentConfig,
   transaction,
   formError,
+  paymentError,
   quotesError,
   creating,
   loadingQuotes,
@@ -43,6 +44,10 @@ const {
   displayDeliveryFee,
   orderTotal,
   widgetRedirectUrl,
+  widgetCustomerEmail,
+  widgetCustomerFullName,
+  widgetCustomerPhone,
+  resolveTransactionId,
   continueToPayment,
   editDetails,
   onCardPaid,
@@ -141,7 +146,7 @@ const {
       </section>
 
       <div class="lg:mt-8">
-        <section v-if="!transaction" class="mt-6 lg:mt-0">
+        <section v-if="step !== 'payment'" class="mt-6 lg:mt-0">
           <form class="grid gap-4" novalidate @submit="continueToPayment">
             <h2 class="text-sm font-medium">Customer & delivery</h2>
 
@@ -262,11 +267,12 @@ const {
             <div class="mt-3">
               <CardPaymentForm
                 v-if="paymentConfig"
-                :transaction-id="transaction.id"
                 :payment-config="paymentConfig"
+                :resolve-transaction-id="resolveTransactionId"
                 @paid="onCardPaid"
               />
             </div>
+            <UiAlert v-if="paymentError" class="mt-3">{{ paymentError }}</UiAlert>
             <UiButton
               type="button"
               variant="secondary"
@@ -281,11 +287,11 @@ const {
             <h2 class="text-sm font-medium">Other methods</h2>
             <div class="mt-3">
               <WompiWidgetPay
-                :transaction-id="transaction.id"
+                :resolve-transaction-id="resolveTransactionId"
                 :redirect-url="widgetRedirectUrl"
-                :customer-email="transaction.customer.email"
-                :customer-full-name="transaction.customer.fullName"
-                :customer-phone="transaction.customer.phone"
+                :customer-email="widgetCustomerEmail"
+                :customer-full-name="widgetCustomerFullName"
+                :customer-phone="widgetCustomerPhone"
               />
             </div>
           </div>

@@ -14,6 +14,8 @@ export const ApiErrorCode = {
   ShippingMethodNotFound: "SHIPPING_METHOD_NOT_FOUND",
   CheckoutSettingsNotFound: "CHECKOUT_SETTINGS_NOT_FOUND",
   TransactionNotFound: "TRANSACTION_NOT_FOUND",
+  CustomerNotFound: "CUSTOMER_NOT_FOUND",
+  DeliveryNotFound: "DELIVERY_NOT_FOUND",
   PaymentFailed: "PAYMENT_FAILED",
   InvalidTransactionState: "INVALID_TRANSACTION_STATE",
   IdempotencyConflict: "IDEMPOTENCY_CONFLICT",
@@ -51,6 +53,9 @@ export const PRODUCT_LIST_PAGE_SIZE = {
 /** Max 1-based offset page accepted by the API (beyond this, use cursors). */
 export const PRODUCT_LIST_OFFSET_PAGE_MAX = 100;
 
+/** Max product ids accepted by GET /products?ids= (no cursor). */
+export const PRODUCT_LIST_IDS_MAX = 20;
+
 export type ProductSort = (typeof PRODUCT_SORTS)[number];
 export type ProductOrder = (typeof PRODUCT_ORDERS)[number];
 
@@ -64,6 +69,11 @@ export type ListProductsQuery = {
   before?: string;
   /** 1-based page (offset). Mutually exclusive with after/before. */
   page?: number;
+  /**
+   * Exact product ids (no cursor). Mutually exclusive with after, before,
+   * page, and q. Unknown ids are omitted; duplicates are collapsed.
+   */
+  ids?: string[];
 };
 
 export function isProductSort(value: unknown): value is ProductSort {
@@ -186,6 +196,18 @@ export type TransactionDeliveryDto = {
   shippingMethodId: string;
   addressLine: string;
   city: ShippingCityCode;
+};
+
+export type CreateCustomerRequest = TransactionCustomerDto;
+
+export type CustomerDto = TransactionCustomerDto & {
+  id: string;
+};
+
+export type CreateDeliveryRequest = TransactionDeliveryDto;
+
+export type DeliveryDto = TransactionDeliveryDto & {
+  id: string;
 };
 
 export type CreateTransactionItemDto = {

@@ -12,5 +12,6 @@ export function toListProductsQuery(
     after: dto.after,
     before: dto.before,
     page: dto.page,
+    ids: dto.ids,
   };
 }

@@ -18,10 +18,14 @@ export class HttpCatalogAdapter extends CatalogPort {
         pageSize: String(query.pageSize),
         sort: query.sort,
         order: query.order,
-        q: query.q,
-        after: query.after,
-        before: query.before,
-        page: query.page && query.page > 1 ? String(query.page) : undefined,
+        q: query.ids ? undefined : query.q,
+        after: query.ids ? undefined : query.after,
+        before: query.ids ? undefined : query.before,
+        page:
+          query.ids || !(query.page && query.page > 1)
+            ? undefined
+            : String(query.page),
+        ids: query.ids?.length ? query.ids.join(",") : undefined,
       },
       signal,
     });

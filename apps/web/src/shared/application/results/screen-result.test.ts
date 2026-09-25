@@ -20,5 +20,6 @@ describe("screen-result", () => {
       CREATE_OUT_OF_STOCK_MESSAGE,
     );
     expect(screenMessage({ status: "not_found" })).toMatch(/couldn't find/i);
+    expect(screenMessage({ status: "stale" })).toMatch(/changed while creating/i);
   });
 });

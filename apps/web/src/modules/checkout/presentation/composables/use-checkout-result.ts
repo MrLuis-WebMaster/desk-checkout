@@ -13,6 +13,7 @@ import {
   syncProviderPayment,
 } from "@/modules/checkout/composition";
 import { finalizeCheckout } from "@/modules/checkout/presentation/composables/finalize-checkout";
+import { purchasedProductsCta } from "@/modules/checkout/presentation/purchased-products-cta";
 import { postChargeOutOfStockMessage } from "@/shared/application/messages/stock-messages";
 
 type ResultTone = "ok" | "danger" | "wait";
@@ -207,6 +208,8 @@ export function useCheckoutResult() {
     }
   });
 
+  const purchasedCta = computed(() => purchasedProductsCta(lines.value));
+
   return {
     loading,
     errorMessage,
@@ -215,6 +218,7 @@ export function useCheckoutResult() {
     view,
     toneClass,
     iconWrapClass,
+    purchasedCta,
     goCatalog,
   };
 }

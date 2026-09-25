@@ -9,7 +9,7 @@ import { setupSwagger } from "#shared/presentation/swagger/setup-swagger.js";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
-  const enableSwagger = env.NODE_ENV !== "production";
+  const enableSwagger = env.ENABLE_SWAGGER;
 
   applyApiHttpHardening(app, {
     nodeEnv: env.NODE_ENV,

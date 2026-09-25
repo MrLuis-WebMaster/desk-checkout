@@ -86,6 +86,29 @@ describe("ListProductsQueryDto", () => {
     expect(dto.sort).toBe("name");
     expect(dto.order).toBe("asc");
   });
+
+  it("accepts a comma-separated ids list", async () => {
+    const dto = plainToInstance(ListProductsQueryDto, {
+      ids: "11111111-1111-4111-8111-111111111111,22222222-2222-4222-8222-222222222222",
+    });
+    const errors = await validate(dto);
+    expect(errors).toHaveLength(0);
+    expect(dto.ids).toEqual([
+      "11111111-1111-4111-8111-111111111111",
+      "22222222-2222-4222-8222-222222222222",
+    ]);
+  });
+
+  it("rejects more than PRODUCT_LIST_IDS_MAX ids", async () => {
+    const ids = Array.from(
+      { length: 21 },
+      (_, i) =>
+        `11111111-1111-4111-8111-${String(i + 1).padStart(12, "0")}`,
+    );
+    const dto = plainToInstance(ListProductsQueryDto, { ids });
+    const errors = await validate(dto);
+    expect(errors.length).toBeGreaterThan(0);
+  });
 });
 
 describe("ProductParamsDto", () => {

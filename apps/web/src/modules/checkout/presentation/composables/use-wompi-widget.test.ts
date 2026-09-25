@@ -28,7 +28,11 @@ describe("useWompiWidget", () => {
     push.mockReset();
   });
 
-  it("opens the widget and routes to the result page on completion", async () => {
+  it("resolves a transaction id before opening the widget", async () => {
+    const resolveTransactionId = vi.fn().mockResolvedValue({
+      status: "ok",
+      transactionId: "tx-1",
+    });
     getWidgetSession.mockResolvedValue({
       status: "ok",
       value: {
@@ -44,8 +48,8 @@ describe("useWompiWidget", () => {
     });
 
     const widget = useWompiWidget({
-      transactionId: () => "tx-1",
-      redirectUrl: () => "https://shop.example/result",
+      resolveTransactionId,
+      redirectUrl: (id) => `https://shop.example/result/${id}`,
       customerEmail: () => "ada@example.com",
       customerFullName: () => "Ada",
       customerPhone: () => "300",
@@ -53,10 +57,12 @@ describe("useWompiWidget", () => {
 
     await widget.openWidget();
 
+    expect(resolveTransactionId).toHaveBeenCalledTimes(1);
+    expect(getWidgetSession).toHaveBeenCalledWith("tx-1");
     expect(openWompiWidgetCheckout).toHaveBeenCalledWith(
       expect.objectContaining({
         publicKey: "pub",
-        redirectUrl: "https://shop.example/result",
+        redirectUrl: "https://shop.example/result/tx-1",
         customerData: expect.objectContaining({
           email: "ada@example.com",
           phoneNumberPrefix: "+57",
@@ -70,6 +76,22 @@ describe("useWompiWidget", () => {
       query: { id: "wompi_1" },
     });
     expect(widget.loading.value).toBe(false);
+  });
+
+  it("surfaces resolve failures without opening a session", async () => {
+    const resolveTransactionId = vi.fn().mockResolvedValue({
+      status: "error",
+      message: "Couldn't create the order.",
+    });
+
+    const widget = useWompiWidget({
+      resolveTransactionId,
+      redirectUrl: () => "https://shop.example/result",
+    });
+    await widget.openWidget();
+
+    expect(widget.errorMessage.value).toMatch(/Couldn't create/i);
+    expect(getWidgetSession).not.toHaveBeenCalled();
   });
 
   it("drops non-https redirect urls", async () => {
@@ -86,7 +108,10 @@ describe("useWompiWidget", () => {
     openWompiWidgetCheckout.mockResolvedValue(undefined);
 
     const widget = useWompiWidget({
-      transactionId: () => "tx-1",
+      resolveTransactionId: async () => ({
+        status: "ok",
+        transactionId: "tx-1",
+      }),
       redirectUrl: () => "http://localhost:5173/result",
     });
     await widget.openWidget();
@@ -101,7 +126,10 @@ describe("useWompiWidget", () => {
     getWidgetSession.mockResolvedValue({ status: "not_found" });
 
     const widget = useWompiWidget({
-      transactionId: () => "tx-1",
+      resolveTransactionId: async () => ({
+        status: "ok",
+        transactionId: "tx-1",
+      }),
       redirectUrl: () => "https://shop.example/result",
     });
     await widget.openWidget();
@@ -124,7 +152,10 @@ describe("useWompiWidget", () => {
     openWompiWidgetCheckout.mockRejectedValue(new Error("blocked"));
 
     const widget = useWompiWidget({
-      transactionId: () => "tx-1",
+      resolveTransactionId: async () => ({
+        status: "ok",
+        transactionId: "tx-1",
+      }),
       redirectUrl: () => "https://shop.example/result",
     });
     await widget.openWidget();

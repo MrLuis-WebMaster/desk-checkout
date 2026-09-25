@@ -3,16 +3,19 @@ import { useWompiWidget } from "@/modules/checkout/presentation/composables/use-
 import { UiAlert, UiButton } from "@/shared/ui";
 
 const props = defineProps<{
-  transactionId: string;
-  redirectUrl: string;
+  resolveTransactionId: () => Promise<
+    | { status: "ok"; transactionId: string }
+    | { status: "error"; message: string }
+  >;
+  redirectUrl: (transactionId: string) => string;
   customerEmail?: string;
   customerFullName?: string;
   customerPhone?: string;
 }>();
 
 const { loading, errorMessage, openWidget } = useWompiWidget({
-  transactionId: () => props.transactionId,
-  redirectUrl: () => props.redirectUrl,
+  resolveTransactionId: () => props.resolveTransactionId(),
+  redirectUrl: (transactionId) => props.redirectUrl(transactionId),
   customerEmail: () => props.customerEmail,
   customerFullName: () => props.customerFullName,
   customerPhone: () => props.customerPhone,

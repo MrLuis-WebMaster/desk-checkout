@@ -29,6 +29,10 @@ import {
   customerDeliverySchema,
   type CustomerDeliveryValues,
 } from "@/modules/checkout/presentation/validation/customer-delivery.schema";
+import { createSharedCreate } from "@/modules/checkout/presentation/ensure-pending-transaction";
+import { isCreateStillCurrent } from "@/modules/checkout/presentation/pending-create-freshness";
+import { reconcileChargeTotal } from "@/modules/checkout/presentation/reconcile-charge-total";
+import type { ScreenResult } from "@/shared/application/results/screen-result";
 
 function linesFingerprint(
   lines: ReadonlyArray<{ productId: string; quantity: number }>,
@@ -39,6 +43,10 @@ function linesFingerprint(
     .join("|");
 }
 
+export type ResolveTransactionIdResult =
+  | { status: "ok"; transactionId: string }
+  | { status: "error"; message: string };
+
 export function useCheckoutPage() {
   const {
     step,
@@ -46,8 +54,11 @@ export function useCheckoutPage() {
     beginCheckout,
     rememberPending,
     clearPending,
+    saveDraft,
+    clearDraft,
     pendingTransactionId,
     pendingCartFingerprint,
+    draft,
   } = useCheckout();
   const cart = useCartStore();
   const router = useRouter();
@@ -80,23 +91,36 @@ export function useCheckoutPage() {
   const transaction = ref<TransactionDto | null>(null);
 
   const formError = ref("");
+  const paymentError = ref("");
   const quotesError = ref("");
-  const creating = ref(false);
+  const continuing = ref(false);
   const loadingQuotes = ref(false);
   const loadingExtras = ref(true);
   const restoring = ref(false);
 
   const cartFingerprint = computed(() => linesFingerprint(cartLines.value));
 
-  const displayLines = computed(() =>
-    cartLines.value.map((line) => ({
+  const displayLines = computed(() => {
+    const order = transaction.value;
+    if (order && order.lines.length > 0) {
+      return order.lines.map((line) => ({
+        productId: line.productId,
+        name: line.productName,
+        price: line.productPrice,
+        quantity: line.quantity,
+        imageUrl:
+          cartLines.value.find((cartLine) => cartLine.productId === line.productId)
+            ?.imageUrl ?? "",
+      }));
+    }
+    return cartLines.value.map((line) => ({
       productId: line.productId,
       name: line.name,
       price: line.price,
       quantity: line.quantity,
       imageUrl: line.imageUrl,
-    })),
-  );
+    }));
+  });
 
   const merchandiseTotal = computed(() =>
     computeMerchandiseTotal(
@@ -120,6 +144,9 @@ export function useCheckoutPage() {
   );
 
   const orderTotal = computed(() => {
+    if (transaction.value) {
+      return transaction.value.total;
+    }
     if (displayLines.value.length === 0) {
       return 0;
     }
@@ -133,16 +160,42 @@ export function useCheckoutPage() {
     });
   });
 
-  const widgetRedirectUrl = computed(() => {
-    if (!transaction.value || typeof window === "undefined") {
+  const widgetCustomerEmail = computed(
+    () => transaction.value?.customer.email ?? email.value ?? draft.value?.email,
+  );
+  const widgetCustomerFullName = computed(
+    () =>
+      transaction.value?.customer.fullName ??
+      fullName.value ??
+      draft.value?.fullName,
+  );
+  const widgetCustomerPhone = computed(
+    () => transaction.value?.customer.phone ?? phone.value ?? draft.value?.phone,
+  );
+
+  function widgetRedirectUrl(transactionId: string): string {
+    if (typeof window === "undefined") {
       return "";
     }
-    return `${window.location.origin}/checkout/result/${transaction.value.id}`;
-  });
+    return `${window.location.origin}/checkout/result/${transactionId}`;
+  }
+
+  /** Bumped on invalidate so in-flight creates discard stale success. */
+  let createEpoch = 0;
 
   function invalidatePendingOrder() {
+    createEpoch += 1;
     transaction.value = null;
     clearPending();
+  }
+
+  function hydrateFormFromDraft(values: CustomerDeliveryValues) {
+    setFieldValue("fullName", values.fullName);
+    setFieldValue("email", values.email);
+    setFieldValue("phone", values.phone);
+    setFieldValue("addressLine", values.addressLine);
+    setFieldValue("city", values.city);
+    setFieldValue("shippingMethodId", values.shippingMethodId);
   }
 
   function hydrateFormFromTransaction(order: TransactionDto) {
@@ -152,6 +205,101 @@ export function useCheckoutPage() {
     setFieldValue("addressLine", order.delivery.addressLine);
     setFieldValue("city", order.delivery.city);
     setFieldValue("shippingMethodId", order.delivery.shippingMethodId);
+  }
+
+  function createErrorMessage(result: Exclude<ScreenResult<TransactionDto>, { status: "ok" }>) {
+    if (result.status === "out_of_stock") {
+      return CREATE_OUT_OF_STOCK_MESSAGE;
+    }
+    if (result.status === "not_found") {
+      return "That product is no longer available.";
+    }
+    if (result.status === "stale") {
+      return "Checkout changed while creating the order. Try again.";
+    }
+    return "Couldn't create the order. Check the form and try again.";
+  }
+
+  const pendingCreate = createSharedCreate<ScreenResult<TransactionDto>>({
+    getExisting: () =>
+      transaction.value
+        ? { status: "ok" as const, value: transaction.value }
+        : null,
+    create: async () => {
+      const epochAtStart = createEpoch;
+      const fingerprintAtStart = cartFingerprint.value;
+      const linesAtStart = cartLines.value.map((line) => ({
+        productId: line.productId,
+        quantity: line.quantity,
+      }));
+      const draftValues = draft.value;
+      const customer = {
+        fullName: (fullName.value || draftValues?.fullName || "").trim(),
+        email: (email.value || draftValues?.email || "").trim(),
+        phone: (phone.value || draftValues?.phone || "").trim(),
+      };
+      const delivery = {
+        shippingMethodId:
+          (shippingMethodId.value || draftValues?.shippingMethodId || "").trim(),
+        addressLine: (addressLine.value || draftValues?.addressLine || "").trim(),
+        city: (city.value || draftValues?.city || "BOG") as ShippingCityCode,
+      };
+      const result = await createTransaction({
+        items: linesAtStart,
+        customer,
+        delivery,
+      });
+      if (
+        !isCreateStillCurrent({
+          epochAtStart,
+          epochNow: createEpoch,
+          fingerprintAtStart,
+          fingerprintNow: cartFingerprint.value,
+        })
+      ) {
+        return { status: "stale" as const };
+      }
+      if (result.status === "ok") {
+        transaction.value = result.value;
+        rememberPending(result.value.id, fingerprintAtStart);
+      }
+      return result;
+    },
+  });
+
+  async function resolveTransactionId(): Promise<ResolveTransactionIdResult> {
+    paymentError.value = "";
+    if (cartLines.value.length === 0) {
+      return { status: "error", message: "Your cart is empty." };
+    }
+    if (!paymentConfig.value) {
+      return {
+        status: "error",
+        message: "Payment is temporarily unavailable.",
+      };
+    }
+    const displayedTotal = orderTotal.value;
+    try {
+      const result = await pendingCreate.ensure();
+      if (result.status !== "ok") {
+        const message = createErrorMessage(result);
+        paymentError.value = message;
+        return { status: "error", message };
+      }
+      const reconciled = reconcileChargeTotal({
+        displayedTotal,
+        chargedTotal: result.value.total,
+      });
+      if (!reconciled.ok) {
+        paymentError.value = reconciled.message;
+        return { status: "error", message: reconciled.message };
+      }
+      return { status: "ok", transactionId: result.value.id };
+    } catch {
+      const message = "Couldn't create the order. Check the form and try again.";
+      paymentError.value = message;
+      return { status: "error", message };
+    }
   }
 
   async function loadExtras() {
@@ -200,15 +348,14 @@ export function useCheckoutPage() {
     const pendingId = pendingTransactionId.value;
     const pendingFingerprint = pendingCartFingerprint.value;
     if (!pendingId || !pendingFingerprint) {
-      beginCheckout();
-      return;
+      return false;
     }
     if (
       cartLines.value.length === 0 ||
       pendingFingerprint !== cartFingerprint.value
     ) {
       invalidatePendingOrder();
-      return;
+      return false;
     }
 
     restoring.value = true;
@@ -216,34 +363,45 @@ export function useCheckoutPage() {
       const result = await getTransaction(pendingId);
       if (result.status !== "ok") {
         invalidatePendingOrder();
-        return;
+        return false;
       }
       const order = result.value;
       if (order.status !== TransactionStatus.Pending) {
         invalidatePendingOrder();
-        return;
+        return false;
       }
       if (linesFingerprint(order.lines) !== cartFingerprint.value) {
         invalidatePendingOrder();
-        return;
+        return false;
       }
 
       hydrateFormFromTransaction(order);
+      saveDraft({
+        fullName: order.customer.fullName,
+        email: order.customer.email,
+        phone: order.customer.phone,
+        addressLine: order.delivery.addressLine,
+        city: order.delivery.city as ShippingCityCode,
+        shippingMethodId: order.delivery.shippingMethodId,
+      });
       await loadQuotes(
         order.delivery.city as ShippingCityCode,
         order.delivery.shippingMethodId,
       );
       transaction.value = order;
       rememberPending(order.id, cartFingerprint.value);
+      return true;
     } catch {
       invalidatePendingOrder();
+      return false;
     } finally {
       restoring.value = false;
     }
   }
 
-  const continueToPayment = handleSubmit(async (values) => {
+  const continueToPayment = handleSubmit(async (formValues) => {
     formError.value = "";
+    paymentError.value = "";
     if (cartLines.value.length === 0) {
       formError.value = "Your cart is empty.";
       return;
@@ -253,39 +411,19 @@ export function useCheckoutPage() {
       return;
     }
 
-    creating.value = true;
+    continuing.value = true;
     try {
-      const result = await createTransaction({
-        items: cartLines.value.map((line) => ({
-          productId: line.productId,
-          quantity: line.quantity,
-        })),
-        customer: {
-          fullName: values.fullName,
-          email: values.email,
-          phone: values.phone,
-        },
-        delivery: {
-          shippingMethodId: values.shippingMethodId,
-          addressLine: values.addressLine,
-          city: values.city,
-        },
+      saveDraft({
+        fullName: formValues.fullName,
+        email: formValues.email,
+        phone: formValues.phone,
+        addressLine: formValues.addressLine,
+        city: formValues.city,
+        shippingMethodId: formValues.shippingMethodId,
       });
-      if (result.status !== "ok") {
-        if (result.status === "out_of_stock") {
-          formError.value = CREATE_OUT_OF_STOCK_MESSAGE;
-          return;
-        }
-        formError.value =
-          result.status === "not_found"
-            ? "That product is no longer available."
-            : "Couldn't create the order. Check the form and try again.";
-        return;
-      }
-      transaction.value = result.value;
-      rememberPending(result.value.id, cartFingerprint.value);
+      startPayment();
     } finally {
-      creating.value = false;
+      continuing.value = false;
     }
   });
 
@@ -296,6 +434,7 @@ export function useCheckoutPage() {
    */
   function editDetails() {
     invalidatePendingOrder();
+    paymentError.value = "";
   }
 
   function onCardPaid(paid: TransactionDto) {
@@ -308,7 +447,7 @@ export function useCheckoutPage() {
   }
 
   watch(city, (shippingCity) => {
-    if (!shippingCity || transaction.value) {
+    if (!shippingCity || step.value === "payment") {
       return;
     }
     void loadQuotes(shippingCity as ShippingCityCode);
@@ -319,34 +458,39 @@ export function useCheckoutPage() {
     (fingerprint, previous) => {
       if (previous !== undefined && fingerprint !== previous) {
         invalidatePendingOrder();
+        clearDraft();
       }
       if (cartLines.value.length === 0) {
         invalidatePendingOrder();
+        clearDraft();
       }
     },
-  );
-
-  // Step label must match the live order on this page, not a stale store flag.
-  watch(
-    transaction,
-    (order) => {
-      if (order) {
-        startPayment();
-      } else {
-        beginCheckout();
-      }
-    },
-    { immediate: true },
   );
 
   onMounted(() => {
-    beginCheckout();
     void (async () => {
       await loadExtras();
-      await restorePendingOrder();
-      if (!transaction.value) {
-        void loadQuotes((city.value as ShippingCityCode) || "BOG");
+
+      if (draft.value) {
+        hydrateFormFromDraft(draft.value);
       }
+
+      const restored = await restorePendingOrder();
+      if (restored) {
+        return;
+      }
+
+      if (draft.value && step.value === "payment" && hasCart.value) {
+        await loadQuotes(
+          (draft.value.city as ShippingCityCode) || "BOG",
+          draft.value.shippingMethodId,
+        );
+        startPayment();
+        return;
+      }
+
+      beginCheckout();
+      void loadQuotes((city.value as ShippingCityCode) || "BOG");
     })();
   });
 
@@ -369,8 +513,10 @@ export function useCheckoutPage() {
     paymentConfig,
     transaction,
     formError,
+    paymentError,
     quotesError,
-    creating,
+    continuing,
+    creating: continuing,
     loadingQuotes,
     loadingExtras,
     restoring,
@@ -380,6 +526,10 @@ export function useCheckoutPage() {
     selectedQuote,
     orderTotal,
     widgetRedirectUrl,
+    widgetCustomerEmail,
+    widgetCustomerFullName,
+    widgetCustomerPhone,
+    resolveTransactionId,
     continueToPayment,
     editDetails,
     onCardPaid,

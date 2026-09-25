@@ -24,9 +24,18 @@ describe("finalizeCheckout", () => {
   });
 
   it("clears cart and pending only when approved", () => {
+    useCheckoutStore().saveDraft({
+      fullName: "Ada",
+      email: "a@b.c",
+      phone: "1",
+      addressLine: "x",
+      city: "BOG",
+      shippingMethodId: "s1",
+    });
     finalizeCheckout(TransactionStatus.Approved);
     expect(useCartStore().lines).toHaveLength(0);
     expect(useCheckoutStore().pendingTransactionId).toBeNull();
+    expect(useCheckoutStore().draft).toBeNull();
   });
 
   it("does not clear cart on non-approved statuses", () => {

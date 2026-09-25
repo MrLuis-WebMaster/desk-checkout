@@ -37,7 +37,11 @@ vi.mock("@/modules/checkout/presentation/composables/finalize-checkout", () => (
 }));
 
 vi.mock("@/app/router", () => ({
-  routeNames: { productList: "product-list", checkout: "checkout" },
+  routeNames: {
+    productList: "productList",
+    product: "product",
+    checkout: "checkout",
+  },
 }));
 
 function transaction(status: TransactionStatus) {
@@ -83,7 +87,8 @@ describe("useCheckoutResult", () => {
     });
 
     const { useCheckoutResult } = await import("./use-checkout-result");
-    const { loading, errorMessage, total, view } = useCheckoutResult();
+    const { loading, errorMessage, total, view, purchasedCta } =
+      useCheckoutResult();
     await vi.waitFor(() => expect(loading.value).toBe(false));
 
     expect(errorMessage.value).toBe("");
@@ -91,6 +96,38 @@ describe("useCheckoutResult", () => {
     expect(finalizeCheckout).toHaveBeenCalledWith(TransactionStatus.Approved);
     expect(view.value?.title).toMatch(/approved/i);
     expect(view.value?.tone).toBe("ok");
+    expect(purchasedCta.value).toEqual({
+      label: "View purchased product",
+      to: { name: "product", params: { id: "p1" } },
+    });
+  });
+
+  it("builds a multi-product purchased CTA", async () => {
+    const multi = transaction(TransactionStatus.Approved);
+    multi.lines = [
+      {
+        productId: "p1",
+        productName: "Lamp",
+        productPrice: 10000,
+        quantity: 1,
+      },
+      {
+        productId: "p2",
+        productName: "Chair",
+        productPrice: 20000,
+        quantity: 1,
+      },
+    ];
+    getTransaction.mockResolvedValue({ status: "ok", value: multi });
+
+    const { useCheckoutResult } = await import("./use-checkout-result");
+    const { loading, purchasedCta } = useCheckoutResult();
+    await vi.waitFor(() => expect(loading.value).toBe(false));
+
+    expect(purchasedCta.value).toEqual({
+      label: "View purchased products",
+      to: { name: "productList", query: { ids: "p1,p2" } },
+    });
   });
 
   it("keeps declined/error/pending/expired views without clearing cart policy beyond finalize", async () => {

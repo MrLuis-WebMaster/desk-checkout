@@ -7,7 +7,8 @@ export type ScreenError =
   | { status: "invalid_query" }
   | { status: "out_of_stock" }
   | { status: "load_failed" }
-  | { status: "aborted" };
+  | { status: "aborted" }
+  | { status: "stale" };
 
 export type ScreenResult<T> = ScreenOk<T> | ScreenError;
 
@@ -37,6 +38,8 @@ export function screenMessage(error: ScreenError): string {
       return CREATE_OUT_OF_STOCK_MESSAGE;
     case "load_failed":
       return "Couldn't reach the catalog. Check your connection and try again.";
+    case "stale":
+      return "Checkout changed while creating the order. Try again.";
     case "aborted":
       return "";
   }

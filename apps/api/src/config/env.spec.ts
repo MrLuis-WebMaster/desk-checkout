@@ -28,6 +28,7 @@ describe("parseApiEnv", () => {
       DB_PASSWORD: "checkout",
       DB_NAME: "checkout",
       NODE_ENV: "development",
+      ENABLE_SWAGGER: true,
       WOMPI_BASE_URL: "https://sandbox.wompi.co/v1",
       ...wompi,
     });
@@ -66,6 +67,7 @@ describe("parseApiEnv", () => {
       DB_PASSWORD: "secret",
       DB_NAME: "shop",
       NODE_ENV: "production",
+      ENABLE_SWAGGER: true,
       WOMPI_BASE_URL: "https://production.wompi.co/v1",
       ...wompi,
     });
@@ -96,6 +98,17 @@ describe("parseApiEnv", () => {
         ...db,
       }).WOMPI_PUBLIC_KEY,
     ).toBe("");
+  });
+
+  it("parses ENABLE_SWAGGER off", () => {
+    expect(
+      parseApiEnv({
+        CORS_ORIGIN: "http://localhost:5173",
+        ENABLE_SWAGGER: "0",
+        ...db,
+        ...wompi,
+      }).ENABLE_SWAGGER,
+    ).toBe(false);
   });
 
   it("rejects an invalid port", () => {

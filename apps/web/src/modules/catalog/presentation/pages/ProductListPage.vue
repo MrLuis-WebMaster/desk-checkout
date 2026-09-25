@@ -60,7 +60,7 @@ const SORT_PRESETS: ReadonlyArray<{
 
 const DEFAULT_PRESET = SORT_PRESETS[0];
 
-const { query, setSearch, setListing, clearFilters, goToPage } =
+const { query, setSearch, setListing, clearFilters, goToPage, idsMode } =
   useProductListQuery();
 const { items, total, loading, errorMessage } = useProductList(query);
 
@@ -94,14 +94,17 @@ const appliedPreset = computed(
 );
 const sortIsActive = computed(() => appliedPreset.value.id !== DEFAULT_PRESET.id);
 const hasFilters = computed(
-  () => appliedSearch.value.length > 0 || sortIsActive.value,
+  () =>
+    appliedSearch.value.length > 0 ||
+    sortIsActive.value ||
+    idsMode.value,
 );
 const resultLabel = computed(() =>
   total.value === 1 ? "1 product" : `${total.value} products`,
 );
 const currentPage = computed(() => query.value.page ?? 1);
 const pageCount = computed(() => {
-  if (total.value === 0) {
+  if (idsMode.value || total.value === 0) {
     return 0;
   }
   return Math.min(
@@ -109,7 +112,9 @@ const pageCount = computed(() => {
     PRODUCT_LIST_OFFSET_PAGE_MAX,
   );
 });
-const showPagination = computed(() => !loading.value && pageCount.value > 1);
+const showPagination = computed(
+  () => !idsMode.value && !loading.value && pageCount.value > 1,
+);
 const canGoPrev = computed(() => currentPage.value > 1);
 const canGoNext = computed(
   () => pageCount.value > 0 && currentPage.value < pageCount.value,
@@ -231,6 +236,13 @@ function goNext() {
     </form>
 
     <div v-if="hasFilters" class="mt-3 flex flex-wrap items-center gap-2">
+      <UiFilterLozenge
+        v-if="idsMode"
+        identifier="Order"
+        value="Purchased products"
+        remove-label="Show full catalog"
+        @remove="onClearAll"
+      />
       <UiFilterLozenge
         v-if="appliedSearch"
         identifier="Name"

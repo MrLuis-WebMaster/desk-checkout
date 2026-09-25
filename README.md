@@ -13,6 +13,20 @@ Catalog and checkout for desk gear priced in COP. Shoppers browse stock, pay wit
 
 Product voice and UI tokens live in [`PRODUCT.md`](PRODUCT.md) and [`DESIGN.md`](DESIGN.md).
 
+## Data model
+
+| Entity | Role |
+| --- | --- |
+| **Product** | Catalog item: name, description, price (integer COP), image URL. |
+| **Inventory** | One row per product with `available` units. Stock decrements only on **APPROVED**. |
+| **Customer** | Guest buyer: full name, email, phone. Created with the order (or via `POST /customers`). |
+| **Delivery** | Address line, city code, and shipping method. Created with the order (or via `POST /deliveries`). |
+| **Transaction** | Order snapshot: line items, base fee, delivery fee, total, status, optional Wompi provider id. |
+| **Shipping** | Active methods plus per-city rates (`shipping_methods` / `shipping_rates`). |
+| **Base fee** | Checkout setting (`checkout_settings`) added to every order total alongside delivery. |
+
+Money fields are integer COP throughout.
+
 ## Documentation
 
 | Guide | Topic |
@@ -42,12 +56,16 @@ pnpm dev
 | --- | --- |
 | Web | http://localhost:5173 |
 | API health | http://localhost:3000/health |
-| API docs | http://localhost:3000/docs |
+| API docs (Swagger) | http://localhost:3000/docs |
 | Worker health | http://localhost:3001/health |
 
 PostgreSQL: `localhost:5433` (user/password/db `checkout`). Port **5433** avoids clashing with a local Postgres on 5432.
 
 After schema changes, run `pnpm db:migrate` and `pnpm db:seed` again.
+
+### API docs (Swagger)
+
+OpenAPI UI is served at **`/docs`** when `ENABLE_SWAGGER` is unset/`1`/`true` (default, including production). Set `ENABLE_SWAGGER=0` to disable docs and Swagger CSP. Locally: [http://localhost:3000/docs](http://localhost:3000/docs). After deploy: `https://<api-host>/docs` (replace with the public API host). No Postman collection is maintained.
 
 ## Environment
 
@@ -97,6 +115,21 @@ pnpm build
 pnpm audit:ci
 ```
 
+### Coverage (`pnpm test:cov`)
+
+Gate: **80%** lines and statements per package (branches not gated). Numbers from the latest local run:
+
+| Package | Statements | Lines | Branches | Functions |
+| --- | ---: | ---: | ---: | ---: |
+| `@checkout/api` | 88.83% | 89.08% | 80.4% | 87.12% |
+| `@checkout/web` | 88.07% | 88.07% | 84.27% | 92.2% |
+| `@checkout/worker` | 88.99% | 89.52% | 76.47% | 93.93% |
+| `@checkout/contracts` | 100% | 100% | 100% | 100% |
+| `@checkout/settlement` | 97.72% | 97.7% | 92.3% | 100% |
+| `@checkout/settlement-typeorm` | 97.65% | 97.61% | 81.39% | 100% |
+
+API/worker/packages use **Jest**; the web app uses **Vitest**. Details: [`docs/testing.md`](docs/testing.md).
+
 ## CI
 
 On `pull_request` and `push` to `main` (`.github/workflows/ci.yml`):
@@ -116,6 +149,11 @@ See [`docs/security.md`](docs/security.md) — Helmet/CORS/ValidationPipe, trust
 ## Deploy
 
 Prod-like smoke (Postgres **5434**, api **3000**, worker **3001**, web **8080**). Coolify checklist, migrate-on-start, and env details: [`docs/operations.md`](docs/operations.md).
+
+| Surface | URL |
+| --- | --- |
+| Deployed web | `https://<web-host>` (set after Coolify / public DNS) |
+| Deployed API docs | `https://<api-host>/docs` |
 
 ```bash
 docker compose -f docker-compose.prod.yml up --build -d

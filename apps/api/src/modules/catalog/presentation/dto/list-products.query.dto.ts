@@ -1,15 +1,20 @@
-import { Type } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
+  IsArray,
   IsIn,
   IsInt,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
 } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
+  PRODUCT_LIST_IDS_MAX,
   PRODUCT_LIST_OFFSET_PAGE_MAX,
   PRODUCT_LIST_PAGE_SIZE,
   PRODUCT_ORDERS,
@@ -17,6 +22,23 @@ import {
   type ProductOrder,
   type ProductSort,
 } from "@checkout/contracts";
+
+function toIdList({ value }: { value: unknown }): unknown {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  const parts = Array.isArray(value) ? value : [value];
+  const ids = parts.flatMap((part) => {
+    if (typeof part !== "string") {
+      return [];
+    }
+    return part
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+  });
+  return ids.length > 0 ? ids : undefined;
+}
 
 export class ListProductsQueryDto {
   @ApiPropertyOptional({
@@ -51,7 +73,7 @@ export class ListProductsQueryDto {
   @ApiPropertyOptional({
     maxLength: 2048,
     description:
-      "Cursor de la página siguiente. Mutuamente excluyente con `page` y `before`.",
+      "Cursor de la página siguiente. Mutuamente excluyente con `page`, `before` e `ids`.",
   })
   @IsOptional()
   @IsString()
@@ -61,7 +83,7 @@ export class ListProductsQueryDto {
   @ApiPropertyOptional({
     maxLength: 2048,
     description:
-      "Cursor de la página anterior. Mutuamente excluyente con `page` y `after`.",
+      "Cursor de la página anterior. Mutuamente excluyente con `page`, `after` e `ids`.",
   })
   @IsOptional()
   @IsString()
@@ -74,7 +96,7 @@ export class ListProductsQueryDto {
     default: 1,
     type: Number,
     description:
-      "Página 1-based (offset). Solo cuando no se envían `after`/`before`. Máximo alineado con PRODUCT_LIST_OFFSET_PAGE_MAX; más allá usa cursores.",
+      "Página 1-based (offset). Solo cuando no se envían `after`/`before`/`ids`. Máximo alineado con PRODUCT_LIST_OFFSET_PAGE_MAX; más allá usa cursores.",
   })
   @IsOptional()
   @Type(() => Number)
@@ -82,4 +104,19 @@ export class ListProductsQueryDto {
   @Min(1)
   @Max(PRODUCT_LIST_OFFSET_PAGE_MAX)
   page?: number;
+
+  @ApiPropertyOptional({
+    type: [String],
+    format: "uuid",
+    maxItems: PRODUCT_LIST_IDS_MAX,
+    description:
+      "Ids exactos de productos (sin cursor). Mutuamente excluyente con `after`, `before`, `page` y `q`. Desconocidos se omiten; duplicados se colapsan.",
+  })
+  @IsOptional()
+  @Transform(toIdList)
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(PRODUCT_LIST_IDS_MAX)
+  @IsUUID("4", { each: true })
+  ids?: string[];
 }
