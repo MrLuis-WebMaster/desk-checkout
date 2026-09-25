@@ -105,6 +105,7 @@ jobs:
           context: .
           file: apps/web/Dockerfile
           push: false
+          load: true
           tags: checkout-web:ci
           build-args: |
             VITE_API_URL=http://localhost:3000
