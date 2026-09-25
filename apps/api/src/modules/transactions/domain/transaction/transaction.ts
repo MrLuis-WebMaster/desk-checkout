@@ -115,17 +115,27 @@ export class Transaction {
     status: TransactionStatus,
   ): Transaction {
     if (this.hasProviderCharge()) {
-      if (
-        this.providerTransactionId === providerTransactionId &&
-        this.status === status
-      ) {
+      if (this.providerTransactionId !== providerTransactionId) {
+        throw new InvalidTransactionStateError();
+      }
+      if (this.status === status) {
         return this;
+      }
+      if (this.status === TransactionStatus.Pending) {
+        return this.withPayment(providerTransactionId, status);
       }
       throw new InvalidTransactionStateError();
     }
     if (this.status !== TransactionStatus.Pending) {
       throw new InvalidTransactionStateError();
     }
+    return this.withPayment(providerTransactionId, status);
+  }
+
+  private withPayment(
+    providerTransactionId: string,
+    status: TransactionStatus,
+  ): Transaction {
     return new Transaction(
       this.id,
       status,

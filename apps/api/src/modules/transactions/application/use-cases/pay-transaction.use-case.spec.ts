@@ -47,6 +47,7 @@ describe("PayTransactionUseCase", () => {
   const writer = {
     save: jest.fn(),
     claimForPayment: jest.fn(),
+    releaseClaim: jest.fn(),
     updateAfterPayment: jest.fn(),
   };
   const gateway = {
@@ -71,6 +72,7 @@ describe("PayTransactionUseCase", () => {
     jest.resetAllMocks();
     idempotency.find.mockResolvedValue(null);
     writer.claimForPayment.mockResolvedValue(true);
+    writer.releaseClaim.mockResolvedValue(undefined);
     idempotency.begin.mockResolvedValue(undefined);
     idempotency.complete.mockResolvedValue(undefined);
     idempotency.abort.mockResolvedValue(undefined);
@@ -239,7 +241,7 @@ describe("PayTransactionUseCase", () => {
     expect(idempotency.complete).toHaveBeenCalled();
   });
 
-  it("aborts the idempotency key when the provider fails", async () => {
+  it("releases the claim when the provider fails before a charge exists", async () => {
     gateway.createCardPayment.mockRejectedValue(new PaymentGatewayError("down"));
     const result = await useCase.execute(
       pendingTransaction().id,
@@ -250,6 +252,46 @@ describe("PayTransactionUseCase", () => {
     if (!result.ok) {
       expect(result.error.code).toBe("PAYMENT_FAILED");
     }
-    expect(idempotency.abort).not.toHaveBeenCalled();
+    expect(writer.releaseClaim).toHaveBeenCalledWith(pendingTransaction().id);
+    expect(idempotency.abort).toHaveBeenCalledWith("key-8");
+  });
+
+  it("settles a pending provider charge when a later poll is approved", async () => {
+    const charged = Transaction.rehydrate({
+      id: pendingTransaction().id,
+      status: TransactionStatus.Pending,
+      productId: "11111111-1111-4111-8111-111111111111",
+      productName: "Lamp",
+      productPrice: Money.create(10000),
+      baseFee: Money.create(500),
+      deliveryFee: Money.create(1500),
+      total: Money.create(12000),
+      customer: pendingTransaction().customer,
+      delivery: pendingTransaction().delivery,
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      providerTransactionId: "wompi_pending",
+    });
+    transactions.findAggregateById.mockResolvedValue(charged);
+    gateway.getPaymentStatus.mockResolvedValue({
+      providerTransactionId: "wompi_pending",
+      status: TransactionStatus.Approved,
+    });
+    writer.updateAfterPayment.mockImplementation(async (transaction) => ({
+      dto: { id: transaction.id, status: transaction.status },
+      stockDecremented: true,
+    }));
+
+    const result = await useCase.execute(charged.id, "key-9", payRequest);
+
+    expect(result.ok).toBe(true);
+    expect(writer.claimForPayment).not.toHaveBeenCalled();
+    expect(gateway.createCardPayment).not.toHaveBeenCalled();
+    expect(writer.updateAfterPayment).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: TransactionStatus.Approved,
+        providerTransactionId: "wompi_pending",
+      }),
+      { decrementStock: true },
+    );
   });
 });

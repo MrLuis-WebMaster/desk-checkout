@@ -34,6 +34,17 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
     return (result.affected ?? 0) === 1;
   }
 
+  async releaseClaim(transactionId: string): Promise<void> {
+    await this.dataSource.getRepository(TransactionOrmEntity).update(
+      {
+        id: transactionId,
+        status: TransactionStatus.Pending,
+        providerTransactionId: `claim:${transactionId}`,
+      },
+      { providerTransactionId: null },
+    );
+  }
+
   async save(transaction: Transaction): Promise<TransactionDto> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();

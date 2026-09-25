@@ -5,7 +5,10 @@ import {
   type PayTransactionRequest,
   type TransactionDto,
 } from "@checkout/contracts";
-import { PaymentGateway } from "#modules/payments/application/ports/payment-gateway.port.js";
+import {
+  PaymentGateway,
+  type ProviderPayment,
+} from "#modules/payments/application/ports/payment-gateway.port.js";
 import { err, ok, type Result } from "#shared/result/result.js";
 import {
   IdempotencyConflictError,
@@ -76,7 +79,8 @@ export class PayTransactionUseCase {
       return err(new TransactionNotFoundError());
     }
 
-    let provider;
+    let provider: ProviderPayment | undefined;
+    let claimed = false;
     try {
       if (transaction.hasProviderCharge()) {
         if (transaction.status !== TransactionStatus.Pending) {
@@ -87,7 +91,7 @@ export class PayTransactionUseCase {
           transaction.providerTransactionId as string,
         );
       } else if (transaction.canStartPayment()) {
-        const claimed = await this.writer.claimForPayment(transaction.id);
+        claimed = await this.writer.claimForPayment(transaction.id);
         if (!claimed) {
           await this.idempotency.abort(idempotencyKey);
           return err(new InvalidTransactionStateError());
@@ -118,6 +122,10 @@ export class PayTransactionUseCase {
         );
       }
     } catch {
+      if (!provider && claimed) {
+        await this.writer.releaseClaim(transaction.id);
+        await this.idempotency.abort(idempotencyKey);
+      }
       return err(new PaymentFailedError());
     }
 

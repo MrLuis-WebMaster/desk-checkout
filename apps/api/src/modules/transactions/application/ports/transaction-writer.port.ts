@@ -9,6 +9,7 @@ export type PaymentSettlement = {
 export abstract class TransactionWriter {
   abstract save(transaction: Transaction): Promise<TransactionDto>;
   abstract claimForPayment(transactionId: string): Promise<boolean>;
+  abstract releaseClaim(transactionId: string): Promise<void>;
   abstract updateAfterPayment(
     transaction: Transaction,
     options: { decrementStock: boolean },
