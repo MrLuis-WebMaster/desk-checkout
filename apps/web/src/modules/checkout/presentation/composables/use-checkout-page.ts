@@ -19,6 +19,7 @@ import {
   listShippingQuotes,
 } from "@/modules/checkout/composition";
 import { useCheckout } from "@/modules/checkout/presentation/composables/use-checkout";
+import { CREATE_OUT_OF_STOCK_MESSAGE } from "@/shared/application/messages/stock-messages";
 import { useCartStore } from "@/modules/checkout/presentation/stores/cart.store";
 import {
   SHIPPING_CITY_CODES,
@@ -110,6 +111,14 @@ export function useCheckoutPage() {
     quotes.value.find((quote) => quote.id === shippingMethodId.value),
   );
 
+  const displayBaseFee = computed(
+    () => transaction.value?.baseFee ?? baseFee.value,
+  );
+
+  const displayDeliveryFee = computed(
+    () => transaction.value?.deliveryFee ?? selectedQuote.value?.amount ?? 0,
+  );
+
   const orderTotal = computed(() => {
     if (displayLines.value.length === 0) {
       return 0;
@@ -119,9 +128,8 @@ export function useCheckoutPage() {
         unitPrice: line.price,
         quantity: line.quantity,
       })),
-      baseFee: transaction.value?.baseFee ?? baseFee.value,
-      deliveryFee:
-        transaction.value?.deliveryFee ?? selectedQuote.value?.amount ?? 0,
+      baseFee: displayBaseFee.value,
+      deliveryFee: displayDeliveryFee.value,
     });
   });
 
@@ -264,6 +272,10 @@ export function useCheckoutPage() {
         },
       });
       if (result.status !== "ok") {
+        if (result.status === "out_of_stock") {
+          formError.value = CREATE_OUT_OF_STOCK_MESSAGE;
+          return;
+        }
         formError.value =
           result.status === "not_found"
             ? "That product is no longer available."
@@ -276,6 +288,15 @@ export function useCheckoutPage() {
       creating.value = false;
     }
   });
+
+  /**
+   * Return to Details with the cart intact. Clears the client pending pointer
+   * only; the server may still keep a PENDING row (orphan until expiry /
+   * webhooks in Phase 6). No cancel-pending API yet.
+   */
+  function editDetails() {
+    invalidatePendingOrder();
+  }
 
   function onCardPaid(paid: TransactionDto) {
     const transactionId = paid.id;
@@ -354,10 +375,13 @@ export function useCheckoutPage() {
     loadingExtras,
     restoring,
     merchandiseTotal,
+    displayBaseFee,
+    displayDeliveryFee,
     selectedQuote,
     orderTotal,
     widgetRedirectUrl,
     continueToPayment,
+    editDetails,
     onCardPaid,
   };
 }

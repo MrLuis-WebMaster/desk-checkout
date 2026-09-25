@@ -13,6 +13,7 @@ import {
   syncProviderPayment,
 } from "@/modules/checkout/composition";
 import { finalizeCheckout } from "@/modules/checkout/presentation/composables/finalize-checkout";
+import { postChargeOutOfStockMessage } from "@/shared/application/messages/stock-messages";
 
 type ResultTone = "ok" | "danger" | "wait";
 
@@ -90,6 +91,10 @@ export function useCheckoutResult() {
         }
         if (synced.status === "not_found") {
           errorMessage.value = "We couldn't find that order.";
+          return;
+        }
+        if (synced.status === "out_of_stock") {
+          errorMessage.value = postChargeOutOfStockMessage(transactionId);
           return;
         }
         errorMessage.value =

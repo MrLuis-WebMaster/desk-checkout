@@ -4,12 +4,12 @@ TypeScript monorepo for a product checkout: Vue 3 + Pinia on the frontend, NestJ
 
 ## Phases
 
-1. Monorepo scaffold, shared contracts, health endpoints, Pinia shell.
-2. Catalog, inventory, and database seed.
-3. Customers, delivery, and transactions.
-4. Checkout orchestration and payment provider.
-5. Frontend checkout flow.
-6. Async worker.
+1. ~~Monorepo scaffold, shared contracts, health endpoints, Pinia shell.~~ **Done**
+2. ~~Catalog, inventory, and database seed.~~ **Done**
+3. ~~Customers, delivery, and transactions.~~ **Done**
+4. ~~Checkout orchestration and payment provider.~~ **Done**
+5. ~~Frontend checkout flow.~~ **Done**
+6. Async worker. *(Wompi webhooks live here.)*
 7. Tests above 80% coverage.
 8. Security, CI, and deployment.
 
@@ -43,7 +43,7 @@ PostgreSQL listens on `localhost:5433` (container port 5432). Database, user, an
 
 - `GET /shipping-methods?city=BOG` — active shipping methods with their city fee
 - `GET /checkout/settings` — current base fee
-- `POST /transactions` — creates a guest transaction in `PENDING` status
+- `POST /transactions` — creates a guest transaction in `PENDING` status from multi-item `items[]` (`productId` + `quantity` per line)
 - `GET /transactions/:id` — returns the transaction with pricing snapshots
 
 The base fee and shipping rates are stored in PostgreSQL and seeded
@@ -60,8 +60,23 @@ Guest `GET /transactions/:id` is keyed by UUID only (no auth yet).
 Sandbox keys come from the [Wompi dashboard](https://comercios.wompi.co/). Copy `WOMPI_*` from `.env.example` into `.env`.
 
 - `GET /payments/config` — public key plus fresh acceptance tokens (no private key)
+- `GET /transactions/:id/widget-session` — signed payload for the Wompi checkout widget
 - `POST /transactions/:id/pay` — card token body and required `Idempotency-Key` header
+- `POST /transactions/:id/sync` — settle a widget payment by provider transaction id; requires `Idempotency-Key`
 
-A transaction charges one product unit. Stock decreases only when Wompi reports `APPROVED`. The same idempotency key and body replay the stored response and do not create a second charge. Vue checkout and Wompi webhooks stay in later phases. The cart quantity in the browser is not sent to this API yet.
+A transaction charges the cart lines sent in `items[]` (quantity included). Stock decreases only when Wompi reports `APPROVED`. The same idempotency key and body replay the stored response and do not create a second charge. Asynchronous Wompi webhooks are Phase 6 (worker).
+
+On localhost HTTP, the widget may omit `redirectUrl` (Wompi rejects non-HTTPS redirects); the in-widget callback still navigates to the result page with the provider id.
 
 All JSON responses use `{ ok: true, data }` or `{ ok: false, error }`.
+
+### Frontend checkout smoke
+
+Manual checks after `pnpm dev`:
+
+1. Add two products with qty > 1 → checkout → Base fee / Shipping / Total match after Continue to payment.
+2. Create order → Pay with card (sandbox) → result Approved; cart cleared.
+3. Create order → Other methods (widget) → complete in-widget → result page syncs.
+4. Zero stock on a line → Continue to payment shows out-of-stock copy that invites updating the cart (not a generic create error).
+5. Edit details on the payment step → returns to Details with cart kept (server may still hold a PENDING orphan until Phase 6).
+6. If pay/sync returns out of stock after a provider charge, the UI must say not to retry, show the order id, and point to support.
