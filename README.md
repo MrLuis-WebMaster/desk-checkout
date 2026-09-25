@@ -7,9 +7,10 @@ Catalog and checkout for desk gear priced in COP. Shoppers browse stock, pay wit
 | Piece | Stack |
 | --- | --- |
 | `apps/web` | Vue 3 + Pinia + Vite |
-| `apps/api` | NestJS modular monolith |
-| `apps/worker` | NestJS — Wompi webhooks + reconciliation |
-| `packages/*` | Shared contracts and settlement |
+| `apps/api` | NestJS modular monolith (checkout + Wompi webhook ingress) |
+| `apps/worker` | NestJS — payment consumer, reconciliation, outbox, notifications skeleton |
+| `packages/*` | Shared contracts, settlement, messaging |
+| Infra (local/prod) | PostgreSQL, RabbitMQ 4, Docker, Wompi sandbox |
 
 Product voice and UI tokens live in [`PRODUCT.md`](PRODUCT.md) and [`DESIGN.md`](DESIGN.md).
 
@@ -20,8 +21,9 @@ Product voice and UI tokens live in [`PRODUCT.md`](PRODUCT.md) and [`DESIGN.md`]
 | **Product** | Catalog item: name, description, price (integer COP), image URL. |
 | **Inventory** | One row per product with `available` units. Stock decrements only on **APPROVED**. |
 | **Customer** | Guest buyer: full name, email, phone. Created with the order (or via `POST /customers`). |
-| **Delivery** | Address line, city code, and shipping method. Created with the order (or via `POST /deliveries`). |
+| **Delivery** | Address line, city code, shipping method, and lifecycle status (`PENDING` → `READY` on approve). |
 | **Transaction** | Order snapshot: line items, base fee, delivery fee, total, status, optional Wompi provider id. |
+| **Outbox** | `outbox_events` for post-purchase `order.confirmed` messages. |
 | **Shipping** | Active methods plus per-city rates (`shipping_methods` / `shipping_rates`). |
 | **Base fee** | Checkout setting (`checkout_settings`) added to every order total alongside delivery. |
 
@@ -31,7 +33,7 @@ Money fields are integer COP throughout.
 
 | Guide | Topic |
 | --- | --- |
-| [`docs/architecture.md`](docs/architecture.md) | Pay → sync → webhook → stuck/orphan; settlement; statuses |
+| [`docs/architecture.md`](docs/architecture.md) | Sync checkout, async webhook, settlement, RabbitMQ, outbox |
 | [`docs/operations.md`](docs/operations.md) | Coolify, env, health, compose.prod smoke |
 | [`docs/testing.md`](docs/testing.md) | `pnpm test` / coverage gate; manual smokes |
 | [`docs/security.md`](docs/security.md) | Hardening, throttler, webhooks, residual risks |
@@ -58,8 +60,9 @@ pnpm dev
 | API health | http://localhost:3000/health |
 | API docs (Swagger) | http://localhost:3000/docs |
 | Worker health | http://localhost:3001/health |
+| RabbitMQ management | http://localhost:15672 (guest/guest) |
 
-PostgreSQL: `localhost:5433` (user/password/db `checkout`). Port **5433** avoids clashing with a local Postgres on 5432.
+PostgreSQL: `localhost:5433` (user/password/db `checkout`). RabbitMQ AMQP: `localhost:5672`. Port **5433** avoids clashing with a local Postgres on 5432.
 
 After schema changes, run `pnpm db:migrate` and `pnpm db:seed` again.
 
@@ -73,24 +76,27 @@ Copy values from `.env.example` / `apps/worker/.env.example`. Sandbox keys come 
 
 | Variable | Who | Notes |
 | --- | --- | --- |
-| `WOMPI_PUBLIC_KEY` / `WOMPI_PRIVATE_KEY` / `WOMPI_INTEGRITY_SECRET` | API | Card charge + widget signature |
-| `WOMPI_EVENTS_SECRET` | Worker | Event checksum (not the integrity secret) |
+| `RABBITMQ_URL` | API + worker | Local default `amqp://guest:guest@localhost:5672` |
+| `WOMPI_PUBLIC_KEY` / `WOMPI_PRIVATE_KEY` / `WOMPI_INTEGRITY_SECRET` | API (+ worker) | Card charge + widget signature |
+| `WOMPI_EVENTS_SECRET` | API | Event checksum (not the integrity secret) |
 | `CORS_ORIGIN` | API | Comma-separated browser origins |
 | `TRUST_PROXY` | API | Off by default. Set only behind a real reverse proxy |
-| `WEBHOOK_MAX_SKEW_SECONDS` | Worker | Default `300` |
+| `WEBHOOK_MAX_SKEW_SECONDS` | API | Default `300` (docs compatibility; skew does not reject) |
 | `STUCK_PENDING_AFTER_MS` / `ORPHAN_PENDING_TTL_MS` / `JOB_INTERVAL_MS` | Worker | Reconciliation timing |
+| `OUTBOX_POLL_MS` | Worker | Outbox publisher interval |
 
 ## How it fits together
 
-1. Web creates a guest transaction (`PENDING`), then charges via card token or the Wompi widget.
-2. Stock decrements only when Wompi reports **APPROVED** — pay, sync, webhook, and stuck recovery all go through the same settlement writer (`packages/settlement`).
+1. Web creates a guest transaction (`PENDING`, delivery `PENDING`), then charges via card token or the Wompi widget.
+2. Stock decrements only when Wompi reports **APPROVED** — pay, sync, webhook-driven consumption, and stuck recovery all go through the same settlement writer (`packages/settlement`). Delivery becomes `READY` and an `order.confirmed` outbox row is written in the same Postgres transaction.
 3. Money fields are integer COP. Creating a transaction snapshots prices and fees; it only checks stock. Payment locks and decrements.
 4. Idempotency keys on pay/sync (and webhook keys `webhook:{providerId}:{status}`) replay safely; no double charge or double decrement.
-5. If Wompi approves but stock cannot be decremented, the order stays `ERROR`, the system attempts a void, and the UI tells the shopper not to retry.
+5. If Wompi approves but stock cannot be decremented, the order stays `ERROR`, delivery `CANCELLED`, the system attempts a void, and the UI tells the shopper not to retry.
 6. Uncharged `PENDING` orders expire to `EXPIRED` after `ORPHAN_PENDING_TTL_MS`.
 7. Guest `GET /transactions/:id` is UUID-only (no auth). Treat UUIDs as secrets.
+8. Wompi Events hit the API → RabbitMQ → worker. Checkout/pay/sync do not require RabbitMQ to be up.
 
-Wompi **Events URL** must point at the worker: `https://<public-host>/webhooks/wompi`.
+Wompi **Events URL** must point at the API: `https://<public-api-host>/webhooks/wompi`.
 
 Full flow and status table: [`docs/architecture.md`](docs/architecture.md).
 
@@ -98,11 +104,11 @@ Full flow and status table: [`docs/architecture.md`](docs/architecture.md).
 
 ```bash
 # with pnpm dev running
-cloudflared tunnel --url http://localhost:3001
-# or: ngrok http 3001
+cloudflared tunnel --url http://localhost:3000
+# or: ngrok http 3000
 ```
 
-Set that HTTPS origin + `/webhooks/wompi` in the Wompi dashboard. Pay and abandon before sync — the webhook should settle. Replay and bad checksums must not mutate stock twice or at all. More checklist items: [`docs/testing.md`](docs/testing.md).
+Set that HTTPS origin + `/webhooks/wompi` in the Wompi dashboard. Pay and abandon before sync — the webhook should publish and the worker should settle. Replay and bad checksums must not mutate stock twice or at all. More checklist items: [`docs/testing.md`](docs/testing.md).
 
 ## Scripts
 
@@ -137,6 +143,7 @@ On `pull_request` and `push` to `main` (`.github/workflows/ci.yml`):
 | Job | Role |
 | --- | --- |
 | `quality` | lint, build, `test:cov` |
+| `messaging-integration` | RabbitMQ service + `@checkout/messaging` integration tests |
 | `docker` | Build api / worker / web images + `nginx -t` |
 | `audit` | Advisory `pnpm audit --audit-level=high` |
 

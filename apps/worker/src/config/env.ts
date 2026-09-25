@@ -13,15 +13,15 @@ export const workerEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
+  RABBITMQ_URL: z.string().min(1).default("amqp://guest:guest@localhost:5672"),
   WOMPI_BASE_URL: z.string().default(""),
   WOMPI_PUBLIC_KEY: z.string().default(""),
   WOMPI_PRIVATE_KEY: z.string().default(""),
   WOMPI_INTEGRITY_SECRET: z.string().default(""),
-  WOMPI_EVENTS_SECRET: z.string().default(""),
   STUCK_PENDING_AFTER_MS: z.coerce.number().int().positive().default(120_000),
   ORPHAN_PENDING_TTL_MS: z.coerce.number().int().positive().default(1_800_000),
   JOB_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
-  WEBHOOK_MAX_SKEW_SECONDS: z.coerce.number().int().positive().default(300),
+  OUTBOX_POLL_MS: z.coerce.number().int().positive().default(5_000),
 }).superRefine((value, ctx) => {
   if (value.NODE_ENV === "test") {
     return;
@@ -30,7 +30,7 @@ export const workerEnvSchema = z.object({
     "WOMPI_PUBLIC_KEY",
     "WOMPI_PRIVATE_KEY",
     "WOMPI_INTEGRITY_SECRET",
-    "WOMPI_EVENTS_SECRET",
+    "RABBITMQ_URL",
   ] as const;
   if (value.NODE_ENV === "production" && value.WOMPI_BASE_URL.trim().length === 0) {
     ctx.addIssue({
@@ -69,15 +69,15 @@ const WORKER_ENV_KEYS = [
   "DB_PASSWORD",
   "DB_NAME",
   "NODE_ENV",
+  "RABBITMQ_URL",
   "WOMPI_BASE_URL",
   "WOMPI_PUBLIC_KEY",
   "WOMPI_PRIVATE_KEY",
   "WOMPI_INTEGRITY_SECRET",
-  "WOMPI_EVENTS_SECRET",
   "STUCK_PENDING_AFTER_MS",
   "ORPHAN_PENDING_TTL_MS",
   "JOB_INTERVAL_MS",
-  "WEBHOOK_MAX_SKEW_SECONDS",
+  "OUTBOX_POLL_MS",
 ] as const;
 
 export function loadEnvironment(): void {

@@ -1,4 +1,4 @@
-import type { TransactionDto } from "@checkout/contracts";
+import { DeliveryStatus, type TransactionDto } from "@checkout/contracts";
 import type { Transaction } from "../../domain/transaction/transaction.js";
 
 export function toTransactionDto(transaction: Transaction): TransactionDto {
@@ -19,7 +19,10 @@ export function toTransactionDto(transaction: Transaction): TransactionDto {
     deliveryFee: transaction.deliveryFee.amount,
     total: transaction.total.amount,
     customer: transaction.customer,
-    delivery: transaction.delivery,
+    delivery: {
+      ...transaction.delivery,
+      status: DeliveryStatus.Pending,
+    },
     createdAt: transaction.createdAt.toISOString(),
   };
 }

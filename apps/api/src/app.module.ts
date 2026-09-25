@@ -11,6 +11,7 @@ import { DeliveriesModule } from "#modules/deliveries/presentation/deliveries.mo
 import { ShippingModule } from "#modules/shipping/presentation/shipping.module.js";
 import { PaymentsModule } from "#modules/payments/presentation/payments.module.js";
 import { TransactionsModule } from "#modules/transactions/presentation/transactions.module.js";
+import { WebhooksModule } from "#modules/webhooks/presentation/webhooks.module.js";
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { TransactionsModule } from "#modules/transactions/presentation/transacti
     ShippingModule,
     PaymentsModule,
     TransactionsModule,
+    WebhooksModule,
   ],
   providers: [
     {

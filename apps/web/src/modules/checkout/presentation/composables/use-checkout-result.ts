@@ -2,6 +2,7 @@ import { computed, onMounted, ref, type Component } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { CircleAlert, CircleCheck, CircleX, Clock } from "@lucide/vue";
 import {
+  DeliveryStatus,
   TransactionStatus,
   type TransactionDto,
   type TransactionLineDto,
@@ -36,11 +37,13 @@ export function useCheckoutResult() {
   const loading = ref(true);
   const errorMessage = ref("");
   const status = ref<TransactionStatus | null>(null);
+  const deliveryStatus = ref<DeliveryStatus | null>(null);
   const lines = ref<TransactionLineDto[]>([]);
   const total = ref(0);
 
   function applyTransaction(value: TransactionDto) {
     status.value = value.status;
+    deliveryStatus.value = value.delivery.status ?? null;
     lines.value =
       value.lines.length > 0
         ? value.lines
@@ -215,6 +218,7 @@ export function useCheckoutResult() {
     errorMessage,
     lines,
     total,
+    deliveryStatus,
     view,
     toneClass,
     iconWrapClass,

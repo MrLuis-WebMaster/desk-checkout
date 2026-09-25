@@ -6,6 +6,24 @@ export enum TransactionStatus {
   Expired = "EXPIRED",
 }
 
+export { DeliveryStatus } from "./delivery-status.js";
+
+export {
+  ORDER_CONFIRMED_TYPE,
+  ORDER_CONFIRMED_VERSION,
+  parseOrderConfirmedEvent,
+  type OrderConfirmedEvent,
+  type ParseOrderConfirmedResult,
+} from "./events/order-confirmed.js";
+
+export {
+  PAYMENT_STATUS_CHANGED_TYPE,
+  PAYMENT_STATUS_CHANGED_VERSION,
+  parsePaymentStatusChangedEvent,
+  type PaymentStatusChangedEvent,
+  type ParsePaymentStatusChangedResult,
+} from "./events/payment-status-changed.js";
+
 export const ApiErrorCode = {
   ValidationError: "VALIDATION_ERROR",
   ProductNotFound: "PRODUCT_NOT_FOUND",
@@ -196,6 +214,8 @@ export type TransactionDeliveryDto = {
   shippingMethodId: string;
   addressLine: string;
   city: ShippingCityCode;
+  /** Present on reads; omit on create (DB default PENDING). */
+  status?: import("./delivery-status.js").DeliveryStatus;
 };
 
 export type CreateCustomerRequest = TransactionCustomerDto;
@@ -208,6 +228,7 @@ export type CreateDeliveryRequest = TransactionDeliveryDto;
 
 export type DeliveryDto = TransactionDeliveryDto & {
   id: string;
+  status: import("./delivery-status.js").DeliveryStatus;
 };
 
 export type CreateTransactionItemDto = {

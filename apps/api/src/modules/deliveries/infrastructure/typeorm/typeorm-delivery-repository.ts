@@ -1,8 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import type {
-  CreateDeliveryRequest,
-  DeliveryDto,
+import {
+  DeliveryStatus,
+  type CreateDeliveryRequest,
+  type DeliveryDto,
 } from "@checkout/contracts";
 import { DeliveryOrmEntity } from "@checkout/settlement-typeorm";
 import { Repository } from "typeorm";
@@ -23,6 +24,7 @@ export class TypeOrmDeliveryRepository extends DeliveryRepository {
         shippingMethodId: input.shippingMethodId,
         addressLine: input.addressLine,
         city: input.city,
+        status: DeliveryStatus.Pending,
       }),
     );
     return toDto(saved);
@@ -40,5 +42,6 @@ function toDto(row: DeliveryOrmEntity): DeliveryDto {
     shippingMethodId: row.shippingMethodId,
     addressLine: row.addressLine,
     city: row.city,
+    status: row.status ?? DeliveryStatus.Pending,
   };
 }

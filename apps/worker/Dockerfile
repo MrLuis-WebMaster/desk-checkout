@@ -9,6 +9,7 @@ COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY apps/worker/package.json ./apps/worker/
 COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/messaging/package.json ./packages/messaging/
 COPY packages/settlement/package.json ./packages/settlement/
 COPY packages/settlement-typeorm/package.json ./packages/settlement-typeorm/
 COPY packages/tsconfig/package.json ./packages/tsconfig/
@@ -27,6 +28,7 @@ COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
 COPY apps/worker/package.json ./apps/worker/
 COPY packages/contracts/package.json ./packages/contracts/
+COPY packages/messaging/package.json ./packages/messaging/
 COPY packages/settlement/package.json ./packages/settlement/
 COPY packages/settlement-typeorm/package.json ./packages/settlement-typeorm/
 COPY packages/tsconfig/package.json ./packages/tsconfig/
@@ -41,6 +43,7 @@ RUN groupadd --system --gid 1001 nestjs \
 COPY --from=prod-deps /app ./
 COPY --from=build /app/apps/worker/dist ./apps/worker/dist
 COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
+COPY --from=build /app/packages/messaging/dist ./packages/messaging/dist
 COPY --from=build /app/packages/settlement/dist ./packages/settlement/dist
 COPY --from=build /app/packages/settlement-typeorm/dist ./packages/settlement-typeorm/dist
 

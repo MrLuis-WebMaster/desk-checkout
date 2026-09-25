@@ -30,10 +30,13 @@ export const apiEnvSchema = z.object({
     .enum(["0", "1", "true", "false"])
     .optional()
     .transform((value) => value === undefined || value === "1" || value === "true"),
+  RABBITMQ_URL: z.string().min(1).default("amqp://guest:guest@localhost:5672"),
   WOMPI_BASE_URL: z.string().default(""),
   WOMPI_PUBLIC_KEY: z.string().default(""),
   WOMPI_PRIVATE_KEY: z.string().default(""),
   WOMPI_INTEGRITY_SECRET: z.string().default(""),
+  WOMPI_EVENTS_SECRET: z.string().default(""),
+  WEBHOOK_MAX_SKEW_SECONDS: z.coerce.number().int().positive().default(300),
 }).superRefine((value, ctx) => {
   if (value.NODE_ENV === "test") {
     return;
@@ -42,6 +45,8 @@ export const apiEnvSchema = z.object({
     "WOMPI_PUBLIC_KEY",
     "WOMPI_PRIVATE_KEY",
     "WOMPI_INTEGRITY_SECRET",
+    "WOMPI_EVENTS_SECRET",
+    "RABBITMQ_URL",
   ] as const;
   if (value.NODE_ENV === "production" && value.WOMPI_BASE_URL.trim().length === 0) {
     ctx.addIssue({
@@ -82,10 +87,13 @@ const API_ENV_KEYS = [
   "DB_NAME",
   "NODE_ENV",
   "ENABLE_SWAGGER",
+  "RABBITMQ_URL",
   "WOMPI_BASE_URL",
   "WOMPI_PUBLIC_KEY",
   "WOMPI_PRIVATE_KEY",
   "WOMPI_INTEGRITY_SECRET",
+  "WOMPI_EVENTS_SECRET",
+  "WEBHOOK_MAX_SKEW_SECONDS",
 ] as const;
 
 export function loadEnvironment(): void {

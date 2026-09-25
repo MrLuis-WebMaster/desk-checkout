@@ -10,6 +10,7 @@ describe("parseApiEnv", () => {
     WOMPI_PUBLIC_KEY: "pub_test",
     WOMPI_PRIVATE_KEY: "prv_test",
     WOMPI_INTEGRITY_SECRET: "integrity",
+    WOMPI_EVENTS_SECRET: "events",
   };
 
   it("applies host/port defaults when variables are missing", () => {
@@ -29,7 +30,9 @@ describe("parseApiEnv", () => {
       DB_NAME: "checkout",
       NODE_ENV: "development",
       ENABLE_SWAGGER: true,
+      RABBITMQ_URL: "amqp://guest:guest@localhost:5672",
       WOMPI_BASE_URL: "https://sandbox.wompi.co/v1",
+      WEBHOOK_MAX_SKEW_SECONDS: 300,
       ...wompi,
     });
   });
@@ -68,7 +71,9 @@ describe("parseApiEnv", () => {
       DB_NAME: "shop",
       NODE_ENV: "production",
       ENABLE_SWAGGER: true,
+      RABBITMQ_URL: "amqp://guest:guest@localhost:5672",
       WOMPI_BASE_URL: "https://production.wompi.co/v1",
+      WEBHOOK_MAX_SKEW_SECONDS: 300,
       ...wompi,
     });
   });

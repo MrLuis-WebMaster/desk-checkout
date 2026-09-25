@@ -1,57 +1,67 @@
 # Architecture
 
-Catalog and checkout for desk gear priced in COP. Shoppers browse stock, pay with Wompi (card or widget), and the API/worker settle each order once through a shared settlement writer.
+Catalog and checkout for desk gear priced in COP. Shoppers browse stock, pay with Wompi (card or widget), and the API/worker settle each order once through a shared settlement writer. RabbitMQ carries asynchronous payment events and post-purchase `order.confirmed` messages. Redis/BullMQ are not used.
 
 ## Apps
 
 | App | Role |
 | --- | --- |
 | `apps/web` | Vue 3 SPA — catalog, guest checkout, Wompi card/widget UI |
-| `apps/api` | NestJS modular monolith — catalog, create/pay/sync transactions, guest status reads |
-| `apps/worker` | NestJS — Wompi webhooks (`POST /webhooks/wompi`) and reconciliation jobs (stuck + orphan) |
+| `apps/api` | NestJS modular monolith — catalog, create/pay/sync, guest status reads, Wompi webhook ingress (`POST /webhooks/wompi`) |
+| `apps/worker` | NestJS — payment event consumer, reconciliation, outbox publisher, notification skeleton |
 
-Shared types live in `packages/contracts`. Settlement domain/application lives in `packages/settlement`; TypeORM persistence adapters live in `packages/settlement-typeorm`. Both `apps/api` and `apps/worker` compose those packages behind ports.
+Shared types live in `packages/contracts`. Settlement domain/application lives in `packages/settlement`; TypeORM persistence adapters live in `packages/settlement-typeorm`. Messaging helpers live in `packages/messaging`.
 
-## Payment and settlement flow
+## Synchronous checkout path
 
 ```text
-Web ──create──► API (PENDING, price/fee snapshot, stock check only)
+Web ──create──► API (PENDING, price/fee snapshot, stock check only, Delivery PENDING)
   │
   ├──pay (card) or widget ──► API ──► Wompi
   │                              │
   │                              └── SettleProviderPaymentService
-  │                                        │
-  ├──sync (poll) ──────────────────────────┤
-  │                                        ▼
-  │                              TransactionWriter.updateAfterPayment
-  │                                        │
-Worker ◄── Wompi Events URL                │  stock− only if APPROVED
-  │   POST /webhooks/wompi                 │
-  │   checksum + skew + idempotency        │
-  │                                        │
-  └── stuck PENDING recovery ──────────────┘
-  └── orphan PENDING → EXPIRED (no provider charge)
+  ├──sync (poll) ──────────────────┤
+  │                                ▼
+  │                      TransactionWriter.updateAfterPayment
+  │                      (status + stock + delivery + outbox)
 ```
 
-1. **Create** — Guest transaction starts as `PENDING`. Money fields are integer COP; create snapshots product prices and fees and **checks** stock. It does not decrement.
-2. **Pay / sync** — Card charge or widget completion, then optional sync, go through the same settlement path as webhooks and stuck recovery.
-3. **Webhook** — Wompi Events URL must target the worker (`…/webhooks/wompi`), not the API. Checksum, timestamp skew, and idempotency keys (`webhook:{providerId}:{status}`) protect settlement.
-4. **Stuck PENDING** — Worker polls provider status for charged-but-unsettled rows and settles via the same writer.
-5. **Orphan PENDING** — Uncharged `PENDING` rows older than `ORPHAN_PENDING_TTL_MS` become `EXPIRED`.
+RabbitMQ is **not** required for create/pay/sync. If the broker is down, checkout still works; only webhook publishing returns 503.
 
-Idempotency on pay/sync (and webhook keys) replays safely: no double charge and no double stock decrement.
+## Asynchronous webhook path
 
-## Single settlement writer
+```text
+Wompi ──► API POST /webhooks/wompi
+            checksum validate
+            publish payment.status.changed (publisher confirm)
+            200
 
-All settlement paths call `SettleProviderPaymentService` → `TransactionWriter.updateAfterPayment` in `packages/settlement`. There is no second stock-decrement path in the API or worker.
+RabbitMQ payment.events
+            │
+Worker PaymentEventConsumer
+            │
+HandleWompiEventUseCase → SettleProviderPaymentService → same writer
+```
 
-If Wompi reports approved but stock cannot be decremented, settlement persists `ERROR`, attempts a void, and completes the idempotency key with `OUT_OF_STOCK`. The UI tells the shopper not to retry.
+Stuck PENDING recovery and orphan expiry still run on the worker and call the same settlement surface.
 
-See also [ADR 0002](adr/0002-single-settlement-writer.md) and `packages/settlement/README.md`.
+## Settlement and delivery
+
+All settlement paths call `SettleProviderPaymentService` → `TransactionWriter.updateAfterPayment`. On `APPROVED` with successful stock decrement, the same Postgres transaction sets Delivery `READY` and inserts an `order.confirmed` outbox row. `DECLINED` / `ERROR` / `EXPIRED` set Delivery `CANCELLED` (no outbox). `SHIPPED` / `DELIVERED` exist in the enum without transitions yet.
+
+## Outbox and notifications
+
+```text
+outbox_events (unpublished)
+  → OutboxPublisher (lease claim)
+  → RabbitMQ order.confirmed
+  → OrderConfirmedConsumer
+  → NotificationPort (NoopNotificationAdapter)
+```
+
+The notification port is an extension point. A real provider must bring its own idempotency strategy; this skeleton does not persist notification dedupe.
 
 ## Transaction statuses
-
-From `packages/contracts` (`TransactionStatus`):
 
 | Status | Meaning |
 | --- | --- |
@@ -63,7 +73,7 @@ From `packages/contracts` (`TransactionStatus`):
 
 ## Money and stock
 
-- **Money** — All amounts are integer COP (no floats). Create snapshots prices and fees onto the transaction.
-- **Stock** — Create only checks availability. Decrement happens only on `APPROVED`, inside the settlement writer.
+- **Money** — Integer COP (no floats). Create snapshots prices and fees; it only checks stock.
+- **Stock** — Decrements only on `APPROVED`, inside the settlement writer — never via a RabbitMQ consumer.
 
-Guest `GET /transactions/:id` is UUID-only with no auth; treat transaction UUIDs as secrets ([ADR 0003](adr/0003-guest-uuid-access.md)).
+Guest `GET /transactions/:id` is UUID-only with no auth; treat transaction UUIDs as secrets ([ADR 0003](adr/0003-guest-uuid-access.md)). See also [ADR 0002](adr/0002-single-settlement-writer.md), [ADR 0008](adr/0008-rabbitmq-asynchronous-messaging.md), [ADR 0009](adr/0009-transactional-outbox.md).

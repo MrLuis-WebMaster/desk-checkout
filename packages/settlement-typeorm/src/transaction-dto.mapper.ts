@@ -1,7 +1,17 @@
-import type { TransactionDto } from "@checkout/contracts";
+import {
+  DeliveryStatus,
+  type TransactionDto,
+} from "@checkout/contracts";
 import type { Transaction } from "@checkout/settlement";
 
-export function toTransactionDto(transaction: Transaction): TransactionDto {
+export type ToTransactionDtoOptions = {
+  deliveryStatus?: DeliveryStatus;
+};
+
+export function toTransactionDto(
+  transaction: Transaction,
+  options: ToTransactionDtoOptions = {},
+): TransactionDto {
   return {
     id: transaction.id,
     status: transaction.status,
@@ -19,7 +29,10 @@ export function toTransactionDto(transaction: Transaction): TransactionDto {
     deliveryFee: transaction.deliveryFee.amount,
     total: transaction.total.amount,
     customer: transaction.customer,
-    delivery: transaction.delivery,
+    delivery: {
+      ...transaction.delivery,
+      status: options.deliveryStatus ?? DeliveryStatus.Pending,
+    },
     createdAt: transaction.createdAt.toISOString(),
   };
 }

@@ -8,7 +8,7 @@ describe("parseWorkerEnv", () => {
     WOMPI_PUBLIC_KEY: "pub_test",
     WOMPI_PRIVATE_KEY: "prv_test",
     WOMPI_INTEGRITY_SECRET: "integrity",
-    WOMPI_EVENTS_SECRET: "events",
+    RABBITMQ_URL: "amqp://guest:guest@localhost:5672",
   };
 
   it("applies defaults and sandbox base url outside production", () => {
@@ -18,10 +18,11 @@ describe("parseWorkerEnv", () => {
       DB_PORT: 5433,
       NODE_ENV: "test",
       WOMPI_BASE_URL: "https://sandbox.wompi.co/v1",
+      RABBITMQ_URL: "amqp://guest:guest@localhost:5672",
       STUCK_PENDING_AFTER_MS: 120_000,
       ORPHAN_PENDING_TTL_MS: 1_800_000,
       JOB_INTERVAL_MS: 60_000,
-      WEBHOOK_MAX_SKEW_SECONDS: 300,
+      OUTBOX_POLL_MS: 5_000,
     });
   });
 

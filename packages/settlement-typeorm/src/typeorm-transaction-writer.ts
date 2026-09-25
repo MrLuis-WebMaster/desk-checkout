@@ -1,4 +1,12 @@
-import { TransactionStatus, type TransactionDto } from "@checkout/contracts";
+import { randomUUID } from "node:crypto";
+import {
+  DeliveryStatus,
+  ORDER_CONFIRMED_TYPE,
+  ORDER_CONFIRMED_VERSION,
+  TransactionStatus,
+  type OrderConfirmedEvent,
+  type TransactionDto,
+} from "@checkout/contracts";
 import {
   Transaction as TransactionAggregate,
   TransactionWriter,
@@ -9,6 +17,7 @@ import { DataSource, EntityManager, IsNull } from "typeorm";
 import { toTransactionDto } from "./transaction-dto.mapper.js";
 import { CustomerOrmEntity } from "./customer.orm-entity.js";
 import { DeliveryOrmEntity } from "./delivery.orm-entity.js";
+import { OutboxEventOrmEntity } from "./outbox-event.orm-entity.js";
 import { TransactionOrmEntity } from "./transaction.orm-entity.js";
 
 export type StockDecrementer = (
@@ -72,28 +81,58 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
     transaction: Transaction,
     options: { claimLeaseBefore: Date },
   ): Promise<boolean> {
-    const result = await this.dataSource
-      .createQueryBuilder()
-      .update(TransactionOrmEntity)
-      .set({
-        status: transaction.status,
-        providerTransactionId: transaction.providerTransactionId,
-        updatedAt: new Date(),
-      })
-      .where("id = :id", { id: transaction.id })
-      .andWhere("status = :status", { status: TransactionStatus.Pending })
-      .andWhere(
-        `(provider_transaction_id IS NULL OR (
-          provider_transaction_id LIKE :claimPrefix
-          AND updated_at < :claimLeaseBefore
-        ))`,
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+    try {
+      const row = await queryRunner.manager
+        .createQueryBuilder(TransactionOrmEntity, "transaction")
+        .setLock("pessimistic_write")
+        .where("transaction.id = :id", { id: transaction.id })
+        .andWhere("transaction.status = :status", {
+          status: TransactionStatus.Pending,
+        })
+        .andWhere(
+          `(transaction.provider_transaction_id IS NULL OR (
+            transaction.provider_transaction_id LIKE :claimPrefix
+            AND transaction.updated_at < :claimLeaseBefore
+          ))`,
+          {
+            claimPrefix: "claim:%",
+            claimLeaseBefore: options.claimLeaseBefore,
+          },
+        )
+        .getOne();
+
+      if (!row) {
+        await queryRunner.rollbackTransaction();
+        return false;
+      }
+
+      await queryRunner.manager.update(
+        TransactionOrmEntity,
+        { id: row.id },
         {
-          claimPrefix: "claim:%",
-          claimLeaseBefore: options.claimLeaseBefore,
+          status: transaction.status,
+          providerTransactionId: transaction.providerTransactionId,
+          updatedAt: new Date(),
         },
-      )
-      .execute();
-    return (result.affected ?? 0) === 1;
+      );
+      await queryRunner.manager.update(
+        DeliveryOrmEntity,
+        { id: row.deliveryId },
+        { status: DeliveryStatus.Cancelled },
+      );
+      await queryRunner.commitTransaction();
+      return true;
+    } catch (error) {
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 
   async save(transaction: Transaction): Promise<TransactionDto> {
@@ -105,7 +144,10 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
         queryRunner.manager.create(CustomerOrmEntity, transaction.customer),
       );
       const delivery = await queryRunner.manager.save(
-        queryRunner.manager.create(DeliveryOrmEntity, transaction.delivery),
+        queryRunner.manager.create(DeliveryOrmEntity, {
+          ...transaction.delivery,
+          status: DeliveryStatus.Pending,
+        }),
       );
       const lineItems = transaction.lines.map((line) => ({
         productId: line.productId,
@@ -132,7 +174,9 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
         }),
       );
       await queryRunner.commitTransaction();
-      return toTransactionDto(transaction);
+      return toTransactionDto(transaction, {
+        deliveryStatus: DeliveryStatus.Pending,
+      });
     } catch (error) {
       await queryRunner.rollbackTransaction();
       throw error;
@@ -163,6 +207,9 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
         if (row.providerTransactionId !== transaction.providerTransactionId) {
           throw new Error("Transaction provider id mismatch on settlement");
         }
+        const delivery = await queryRunner.manager.findOne(DeliveryOrmEntity, {
+          where: { id: row.deliveryId },
+        });
         await queryRunner.commitTransaction();
         return {
           dto: toTransactionDto(
@@ -171,6 +218,7 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
               row.status,
               row.providerTransactionId,
             ),
+            { deliveryStatus: delivery?.status },
           ),
           stockDecremented: row.status === TransactionStatus.Approved,
         };
@@ -208,8 +256,6 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
       );
 
       if ((cas.affected ?? 0) !== 1) {
-        // Another writer won. Roll back any stock decrements from this attempt
-        // so we never double-decrement or leave orphan stock moves.
         await queryRunner.rollbackTransaction();
         const winner = await this.dataSource
           .getRepository(TransactionOrmEntity)
@@ -217,6 +263,9 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
         if (!winner) {
           throw new Error(`Transaction ${transaction.id} not found`);
         }
+        const delivery = await this.dataSource
+          .getRepository(DeliveryOrmEntity)
+          .findOne({ where: { id: winner.deliveryId } });
         return {
           dto: toTransactionDto(
             withPersistedSettlement(
@@ -224,14 +273,61 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
               winner.status,
               winner.providerTransactionId,
             ),
+            { deliveryStatus: delivery?.status },
           ),
           stockDecremented: winner.status === TransactionStatus.Approved,
         };
       }
 
+      let deliveryStatus: DeliveryStatus | undefined;
+
+      if (
+        toPersist.status === TransactionStatus.Approved &&
+        stockDecremented
+      ) {
+        await queryRunner.manager.update(
+          DeliveryOrmEntity,
+          { id: row.deliveryId },
+          { status: DeliveryStatus.Ready },
+        );
+        deliveryStatus = DeliveryStatus.Ready;
+        const occurredAt = new Date();
+        const orderConfirmed: OrderConfirmedEvent = {
+          eventId: randomUUID(),
+          version: ORDER_CONFIRMED_VERSION,
+          type: ORDER_CONFIRMED_TYPE,
+          transactionId: row.id,
+          customerId: row.customerId,
+          deliveryId: row.deliveryId,
+          occurredAt: occurredAt.toISOString(),
+        };
+        await queryRunner.manager.save(
+          queryRunner.manager.create(OutboxEventOrmEntity, {
+            type: ORDER_CONFIRMED_TYPE,
+            aggregateId: row.id,
+            payload: orderConfirmed as unknown as Record<string, unknown>,
+            occurredAt,
+            publishedAt: null,
+            attempts: 0,
+            availableAt: null,
+            lockedUntil: null,
+          }),
+        );
+      } else if (
+        toPersist.status === TransactionStatus.Declined ||
+        toPersist.status === TransactionStatus.Error
+      ) {
+        await queryRunner.manager.update(
+          DeliveryOrmEntity,
+          { id: row.deliveryId },
+          { status: DeliveryStatus.Cancelled },
+        );
+        deliveryStatus = DeliveryStatus.Cancelled;
+      }
+
       await queryRunner.commitTransaction();
       return {
-        dto: toTransactionDto(toPersist),
+        dto: toTransactionDto(toPersist, { deliveryStatus }),
         stockDecremented,
       };
     } catch (error) {

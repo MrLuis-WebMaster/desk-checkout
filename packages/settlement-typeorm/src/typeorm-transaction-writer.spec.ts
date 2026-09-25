@@ -53,18 +53,11 @@ describe("TypeOrmTransactionWriter", () => {
       })),
       createQueryBuilder: jest.fn(),
       update: jest.fn(),
+      findOne: jest.fn(),
     },
-  };
-  const qb = {
-    update: jest.fn().mockReturnThis(),
-    set: jest.fn().mockReturnThis(),
-    where: jest.fn().mockReturnThis(),
-    andWhere: jest.fn().mockReturnThis(),
-    execute: jest.fn(),
   };
   const dataSource = {
     getRepository: jest.fn(() => repo),
-    createQueryBuilder: jest.fn(() => qb),
     createQueryRunner: jest.fn(() => queryRunner),
   };
   const stockDecrementer = jest.fn();
@@ -77,12 +70,11 @@ describe("TypeOrmTransactionWriter", () => {
     jest.clearAllMocks();
     queryRunner.isTransactionActive = true;
     dataSource.getRepository.mockReturnValue(repo);
-    dataSource.createQueryBuilder.mockReturnValue(qb);
     dataSource.createQueryRunner.mockReturnValue(queryRunner);
-    qb.update.mockReturnThis();
-    qb.set.mockReturnThis();
-    qb.where.mockReturnThis();
-    qb.andWhere.mockReturnThis();
+    queryRunner.manager.findOne.mockResolvedValue({
+      id: "delivery-id",
+      status: "PENDING",
+    });
   });
 
   it("claims, releases, and attaches provider ids", async () => {
@@ -117,24 +109,30 @@ describe("TypeOrmTransactionWriter", () => {
     );
   });
 
-  it("expires only null or stale claim leases", async () => {
+  it("expires transaction and cancels delivery in one TX", async () => {
     const leaseBefore = new Date("2026-01-01T01:00:00.000Z");
-    qb.execute.mockResolvedValue({ affected: 1 });
     const expired = pendingTransaction().expireUncharged();
+    const lockQb = {
+      setLock: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue({
+        id: expired.id,
+        deliveryId: "delivery-id",
+        status: TransactionStatus.Pending,
+      }),
+    };
+    queryRunner.manager.createQueryBuilder.mockReturnValue(lockQb);
+    queryRunner.manager.update.mockResolvedValue({ affected: 1 });
 
     await expect(
       writer.expireUncharged(expired, { claimLeaseBefore: leaseBefore }),
     ).resolves.toBe(true);
 
-    expect(qb.andWhere).toHaveBeenCalledWith(
-      expect.stringContaining("provider_transaction_id LIKE :claimPrefix"),
-      expect.objectContaining({
-        claimPrefix: "claim:%",
-        claimLeaseBefore: leaseBefore,
-      }),
-    );
+    expect(queryRunner.manager.update).toHaveBeenCalledTimes(2);
+    expect(queryRunner.commitTransaction).toHaveBeenCalled();
 
-    qb.execute.mockResolvedValue({ affected: 0 });
+    lockQb.getOne.mockResolvedValue(null);
     await expect(
       writer.expireUncharged(expired, { claimLeaseBefore: leaseBefore }),
     ).resolves.toBe(false);
@@ -144,6 +142,7 @@ describe("TypeOrmTransactionWriter", () => {
     await expect(writer.save(pendingTransaction())).resolves.toMatchObject({
       id: pendingTransaction().id,
       status: TransactionStatus.Pending,
+      delivery: expect.objectContaining({ status: "PENDING" }),
     });
     expect(queryRunner.commitTransaction).toHaveBeenCalled();
 
@@ -154,7 +153,7 @@ describe("TypeOrmTransactionWriter", () => {
     expect(queryRunner.rollbackTransaction).toHaveBeenCalled();
   });
 
-  it("decrements stock on approved settlement", async () => {
+  it("decrements stock, marks delivery READY, and writes outbox", async () => {
     const approved = pendingTransaction().applyProviderResult(
       "wompi_1",
       TransactionStatus.Approved,
@@ -166,6 +165,8 @@ describe("TypeOrmTransactionWriter", () => {
         id: approved.id,
         status: TransactionStatus.Pending,
         providerTransactionId: `claim:${approved.id}`,
+        deliveryId: "delivery-id",
+        customerId: "customer-id",
       }),
     };
     queryRunner.manager.createQueryBuilder.mockReturnValue(lockQb);
@@ -179,10 +180,12 @@ describe("TypeOrmTransactionWriter", () => {
     expect(stockDecrementer).toHaveBeenCalled();
     expect(settlement.stockDecremented).toBe(true);
     expect(settlement.dto.status).toBe(TransactionStatus.Approved);
+    expect(settlement.dto.delivery.status).toBe("READY");
+    expect(queryRunner.manager.save).toHaveBeenCalled();
     expect(queryRunner.commitTransaction).toHaveBeenCalled();
   });
 
-  it("marks settlement error when stock cannot decrement", async () => {
+  it("marks settlement error and cancels delivery when stock cannot decrement", async () => {
     const approved = pendingTransaction().applyProviderResult(
       "wompi_1",
       TransactionStatus.Approved,
@@ -194,6 +197,8 @@ describe("TypeOrmTransactionWriter", () => {
         id: approved.id,
         status: TransactionStatus.Pending,
         providerTransactionId: null,
+        deliveryId: "delivery-id",
+        customerId: "customer-id",
       }),
     });
     stockDecrementer.mockResolvedValue(false);
@@ -205,6 +210,7 @@ describe("TypeOrmTransactionWriter", () => {
 
     expect(settlement.stockDecremented).toBe(false);
     expect(settlement.dto.status).toBe(TransactionStatus.Error);
+    expect(settlement.dto.delivery.status).toBe("CANCELLED");
   });
 
   it("returns the winner when CAS loses after a concurrent settle", async () => {
@@ -219,15 +225,23 @@ describe("TypeOrmTransactionWriter", () => {
         id: approved.id,
         status: TransactionStatus.Pending,
         providerTransactionId: null,
+        deliveryId: "delivery-id",
+        customerId: "customer-id",
       }),
     });
     stockDecrementer.mockResolvedValue(true);
     queryRunner.manager.update.mockResolvedValue({ affected: 0 });
-    repo.findOne.mockResolvedValue({
-      id: approved.id,
-      status: TransactionStatus.Approved,
-      providerTransactionId: "wompi_1",
-    });
+    repo.findOne
+      .mockResolvedValueOnce({
+        id: approved.id,
+        status: TransactionStatus.Approved,
+        providerTransactionId: "wompi_1",
+        deliveryId: "delivery-id",
+      })
+      .mockResolvedValueOnce({
+        id: "delivery-id",
+        status: "READY",
+      });
 
     const settlement = await writer.updateAfterPayment(approved, {
       decrementStock: true,
@@ -238,7 +252,7 @@ describe("TypeOrmTransactionWriter", () => {
     expect(settlement.dto.status).toBe(TransactionStatus.Approved);
   });
 
-  it("returns an already-settled row without re-decrementing", async () => {
+  it("returns an already-settled row without re-decrementing or writing outbox", async () => {
     const approved = pendingTransaction().applyProviderResult(
       "wompi_1",
       TransactionStatus.Approved,
@@ -250,6 +264,7 @@ describe("TypeOrmTransactionWriter", () => {
         id: approved.id,
         status: TransactionStatus.Approved,
         providerTransactionId: "wompi_1",
+        deliveryId: "delivery-id",
       }),
     });
 

@@ -1,5 +1,5 @@
 # Prod-like smoke stack. Ports pinned (D5):
-# postgres host 5434, api 3000, worker 3001, web 8080.
+# postgres host 5434, api 3000, worker 3001, web 8080, rabbitmq internal only.
 # Keep a single API replica while migrations run (entrypoint migrates then starts).
 # TRUST_PROXY stays off here: API port is published directly (no reverse proxy).
 # Behind Coolify/nginx set TRUST_PROXY=1 (or hop count) and do not expose API without a proxy.
@@ -21,6 +21,17 @@ services:
       timeout: 5s
       retries: 10
 
+  rabbitmq:
+    image: rabbitmq:4-management
+    volumes:
+      - rabbitmq_prod_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # 5672 / 15672 stay on the compose network only — do not publish publicly.
+
   api:
     build:
       context: .
@@ -32,6 +43,7 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       PORT: "3000"
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
       # Compose web is at :8080 (env_file defaults to a Coolify-style HTTPS origin).
       CORS_ORIGIN: http://localhost:8080
       # Direct host publish — do not trust X-Forwarded-For from clients.
@@ -40,6 +52,8 @@ services:
       - "3000:3000"
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     # Single instance: TypeORM migration:run is not safe under concurrent replicas.
     # In-memory throttler is also per-process — keep one API replica in Coolify unless Redis is added.
@@ -56,10 +70,13 @@ services:
       DB_PORT: "5432"
       PORT: "3001"
       WORKER_PORT: "3001"
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
     ports:
       - "3001:3001"
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       # Wait until API finished dist-only migrate and /health responds.
       api:
@@ -79,3 +96,4 @@ services:
 
 volumes:
   postgres_prod_data:
+  rabbitmq_prod_data:

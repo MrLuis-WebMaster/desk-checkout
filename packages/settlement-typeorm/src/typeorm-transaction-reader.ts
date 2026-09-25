@@ -1,4 +1,5 @@
 import type {
+  DeliveryStatus,
   ShippingCityCode,
   TransactionDto,
   TransactionLineDto,
@@ -26,6 +27,7 @@ type TransactionRow = {
   shippingMethodId: string;
   addressLine: string;
   city: ShippingCityCode;
+  deliveryStatus: DeliveryStatus;
   createdAt: Date;
   providerTransactionId: string | null;
 };
@@ -39,8 +41,13 @@ export class TypeOrmTransactionReader extends TransactionReader {
   }
 
   async findById(id: string): Promise<TransactionDto | null> {
-    const aggregate = await this.findAggregateById(id);
-    return aggregate ? toTransactionDto(aggregate) : null;
+    const row = await this.loadRowById(id);
+    if (!row) {
+      return null;
+    }
+    return toTransactionDto(toAggregate(row), {
+      deliveryStatus: row.deliveryStatus,
+    });
   }
 
   async findAggregateById(id: string): Promise<Transaction | null> {
@@ -133,6 +140,7 @@ export class TypeOrmTransactionReader extends TransactionReader {
         'delivery.shipping_method_id AS "shippingMethodId"',
         'delivery.address_line AS "addressLine"',
         "delivery.city AS city",
+        'delivery.status AS "deliveryStatus"',
         'transaction.created_at AS "createdAt"',
         'transaction.provider_transaction_id AS "providerTransactionId"',
       ]);
