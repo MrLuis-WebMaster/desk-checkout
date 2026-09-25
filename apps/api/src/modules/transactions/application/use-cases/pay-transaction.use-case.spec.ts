@@ -47,19 +47,27 @@ function pendingTransaction() {
 }
 
 describe("PayTransactionUseCase", () => {
-  const transactions = { findById: jest.fn(), findAggregateById: jest.fn() };
+  const transactions = {
+    findById: jest.fn(),
+    findAggregateById: jest.fn(),
+    findAggregateByProviderId: jest.fn(),
+    listStuckPending: jest.fn(),
+    listOrphanPending: jest.fn(),
+  };
   const writer = {
     save: jest.fn(),
     claimForPayment: jest.fn(),
     releaseClaim: jest.fn(),
     attachProviderTransactionId: jest.fn(),
     updateAfterPayment: jest.fn(),
+    expireUncharged: jest.fn(),
   };
   const gateway = {
     getAcceptanceTokens: jest.fn(),
     createCardPayment: jest.fn(),
     createWidgetSession: jest.fn(),
     getPaymentStatus: jest.fn(),
+    voidPayment: jest.fn(),
   };
   const idempotency = {
     find: jest.fn(),

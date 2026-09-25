@@ -1,5 +1,4 @@
 import { Injectable } from "@nestjs/common";
-import { TransactionStatus } from "@checkout/contracts";
 import { env } from "#config/env.js";
 import { PaymentGatewayError } from "../../domain/payment/errors.js";
 import {
@@ -9,12 +8,21 @@ import {
   type ProviderPayment,
   type WidgetCheckoutSession,
 } from "../../application/ports/payment-gateway.port.js";
+import { mapWompiStatus } from "./map-wompi-status.js";
 import { wompiIntegritySignature } from "./wompi-signature.js";
 
 type WompiTransactionBody = {
   data?: {
     id?: string;
     status?: string;
+    reference?: string;
+    amount_in_cents?: number;
+    transaction?: {
+      id?: string;
+      status?: string;
+      reference?: string;
+      amount_in_cents?: number;
+    };
   };
 };
 
@@ -116,15 +124,38 @@ export class WompiHttpPaymentGateway extends PaymentGateway {
     return this.toProviderPayment(body);
   }
 
+  async voidPayment(providerTransactionId: string): Promise<void> {
+    await this.request<WompiTransactionBody>(
+      `/transactions/${providerTransactionId}/void`,
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${this.privateKey}` },
+      },
+    );
+  }
+
   private toProviderPayment(body: WompiTransactionBody): ProviderPayment {
-    const id = body.data?.id;
+    const nested = body.data?.transaction;
+    const id = body.data?.id ?? nested?.id;
+    const status = body.data?.status ?? nested?.status;
+    const reference = body.data?.reference ?? nested?.reference;
+    const amountInCents = body.data?.amount_in_cents ?? nested?.amount_in_cents;
     if (!id) {
       throw new PaymentGatewayError("Wompi transaction id is missing");
     }
-    return {
-      providerTransactionId: id,
-      status: mapWompiStatus(body.data?.status),
-    };
+    try {
+      return {
+        providerTransactionId: id,
+        status: mapWompiStatus(status),
+        reference,
+        amountInCents:
+          typeof amountInCents === "number" ? amountInCents : undefined,
+      };
+    } catch (error) {
+      throw new PaymentGatewayError(
+        error instanceof Error ? error.message : "Unsupported Wompi status",
+      );
+    }
   }
 
   private async request<T>(path: string, init: RequestInit): Promise<T> {
@@ -137,24 +168,12 @@ export class WompiHttpPaymentGateway extends PaymentGateway {
         `Wompi request failed with status ${response.status}`,
       );
     }
-    return (await response.json()) as T;
+    const text = await response.text();
+    if (!text.trim()) {
+      return {} as T;
+    }
+    return JSON.parse(text) as T;
   }
 }
 
-export function mapWompiStatus(status: string | undefined): TransactionStatus {
-  switch (status) {
-    case "APPROVED":
-      return TransactionStatus.Approved;
-    case "DECLINED":
-      return TransactionStatus.Declined;
-    case "PENDING":
-      return TransactionStatus.Pending;
-    case "VOIDED":
-    case "ERROR":
-      return TransactionStatus.Error;
-    default:
-      throw new PaymentGatewayError(
-        `Unsupported Wompi status: ${status ?? "missing"}`,
-      );
-  }
-}
+export { mapWompiStatus } from "./map-wompi-status.js";

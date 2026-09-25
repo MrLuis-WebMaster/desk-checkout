@@ -3,6 +3,7 @@ export enum TransactionStatus {
   Approved = "APPROVED",
   Declined = "DECLINED",
   Error = "ERROR",
+  Expired = "EXPIRED",
 }
 
 export const ApiErrorCode = {

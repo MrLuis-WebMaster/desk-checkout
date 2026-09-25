@@ -11,13 +11,14 @@ import { IdempotencyErrorCode1790300000000 } from "./migrations/1790300000000-Id
 import { TransactionQuantity1790310000000 } from "./migrations/1790310000000-TransactionQuantity.js";
 import { DeliveryCityOnly1790320000000 } from "./migrations/1790320000000-DeliveryCityOnly.js";
 import { TransactionLineItems1790330000000 } from "./migrations/1790330000000-TransactionLineItems.js";
+import { UniqueProviderTransactionId1790340000000 } from "./migrations/1790340000000-UniqueProviderTransactionId.js";
 import { CheckoutSettingOrmEntity } from "#modules/shipping/infrastructure/typeorm/checkout-setting.orm-entity.js";
 import { ShippingMethodOrmEntity } from "#modules/shipping/infrastructure/typeorm/shipping-method.orm-entity.js";
 import { ShippingRateOrmEntity } from "#modules/shipping/infrastructure/typeorm/shipping-rate.orm-entity.js";
-import { CustomerOrmEntity } from "#modules/transactions/infrastructure/typeorm/customer.orm-entity.js";
-import { DeliveryOrmEntity } from "#modules/transactions/infrastructure/typeorm/delivery.orm-entity.js";
-import { TransactionOrmEntity } from "#modules/transactions/infrastructure/typeorm/transaction.orm-entity.js";
-import { IdempotencyKeyOrmEntity } from "#modules/transactions/infrastructure/typeorm/idempotency-key.orm-entity.js";
+import { CustomerOrmEntity } from "@checkout/settlement-typeorm";
+import { DeliveryOrmEntity } from "@checkout/settlement-typeorm";
+import { TransactionOrmEntity } from "@checkout/settlement-typeorm";
+import { IdempotencyKeyOrmEntity } from "@checkout/settlement-typeorm";
 
 export function buildDataSourceOptions(): DataSourceOptions {
   return {
@@ -49,6 +50,7 @@ export function buildDataSourceOptions(): DataSourceOptions {
       TransactionQuantity1790310000000,
       DeliveryCityOnly1790320000000,
       TransactionLineItems1790330000000,
+      UniqueProviderTransactionId1790340000000,
     ],
   };
 }

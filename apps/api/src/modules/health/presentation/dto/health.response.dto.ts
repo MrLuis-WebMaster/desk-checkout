@@ -11,6 +11,7 @@ export class HealthResponseDto {
       Approved: TransactionStatus.Approved,
       Declined: TransactionStatus.Declined,
       Error: TransactionStatus.Error,
+      Expired: TransactionStatus.Expired,
     },
   })
   transactionStatuses!: typeof TransactionStatus;

@@ -1,17 +1,16 @@
-import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
 import type { TransactionDto } from "@checkout/contracts";
-import { Repository } from "typeorm";
 import {
+  IdempotencyConflictError,
   IdempotencyStore,
   type IdempotencyRecord,
-} from "../../application/ports/idempotency-store.port.js";
+} from "@checkout/settlement";
+import { Repository } from "typeorm";
 import { IdempotencyKeyOrmEntity } from "./idempotency-key.orm-entity.js";
+import { isUniqueViolation } from "./is-unique-violation.js";
 
-@Injectable()
+/** Nest-free TypeORM idempotency store. Maps Postgres 23505 → IdempotencyConflictError. */
 export class TypeOrmIdempotencyStore extends IdempotencyStore {
   constructor(
-    @InjectRepository(IdempotencyKeyOrmEntity)
     private readonly keys: Repository<IdempotencyKeyOrmEntity>,
   ) {
     super();
@@ -35,7 +34,19 @@ export class TypeOrmIdempotencyStore extends IdempotencyStore {
     transactionId: string,
     requestHash: string,
   ): Promise<void> {
-    await this.keys.insert({ key, transactionId, requestHash, responseJson: null });
+    try {
+      await this.keys.insert({
+        key,
+        transactionId,
+        requestHash,
+        responseJson: null,
+      });
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        throw new IdempotencyConflictError();
+      }
+      throw error;
+    }
   }
 
   async complete(

@@ -1,0 +1,31 @@
+{
+  "name": "@checkout/settlement-typeorm",
+  "version": "0.0.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "test": "node -e \"process.exit(0)\""
+  },
+  "dependencies": {
+    "@checkout/contracts": "workspace:*",
+    "@checkout/settlement": "workspace:*",
+    "typeorm": "0.3.27"
+  },
+  "devDependencies": {
+    "@checkout/tsconfig": "workspace:*",
+    "@types/node": "22.19.0",
+    "typescript": "7.0.2"
+  },
+  "peerDependencies": {
+    "reflect-metadata": ">=0.2.0"
+  }
+}
