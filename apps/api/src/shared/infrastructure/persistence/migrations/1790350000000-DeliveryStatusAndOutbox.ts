@@ -8,7 +8,36 @@ export class DeliveryStatusAndOutbox1790350000000
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       ALTER TABLE "deliveries"
-      ADD COLUMN "status" varchar(20) NOT NULL DEFAULT 'PENDING'
+      ADD COLUMN "status" varchar(20)
+    `);
+
+    // Backfill from existing terminal transactions before enforcing NOT NULL.
+    await queryRunner.query(`
+      UPDATE "deliveries" AS d
+      SET "status" = 'READY'
+      FROM "transactions" AS t
+      WHERE t."delivery_id" = d."id"
+        AND t."status" = 'APPROVED'
+    `);
+
+    await queryRunner.query(`
+      UPDATE "deliveries" AS d
+      SET "status" = 'CANCELLED'
+      FROM "transactions" AS t
+      WHERE t."delivery_id" = d."id"
+        AND t."status" IN ('DECLINED', 'ERROR', 'EXPIRED')
+    `);
+
+    await queryRunner.query(`
+      UPDATE "deliveries"
+      SET "status" = 'PENDING'
+      WHERE "status" IS NULL
+    `);
+
+    await queryRunner.query(`
+      ALTER TABLE "deliveries"
+      ALTER COLUMN "status" SET DEFAULT 'PENDING',
+      ALTER COLUMN "status" SET NOT NULL
     `);
 
     await queryRunner.query(`

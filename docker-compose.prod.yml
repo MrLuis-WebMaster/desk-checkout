@@ -23,6 +23,10 @@ services:
 
   rabbitmq:
     image: rabbitmq:4-management
+    environment:
+      # guest is loopback-only; apps on the compose network need a real user.
+      RABBITMQ_DEFAULT_USER: checkout
+      RABBITMQ_DEFAULT_PASS: checkout
     volumes:
       - rabbitmq_prod_data:/var/lib/rabbitmq
     healthcheck:
@@ -43,7 +47,7 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       PORT: "3000"
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      RABBITMQ_URL: amqp://checkout:checkout@rabbitmq:5672
       # Compose web is at :8080 (env_file defaults to a Coolify-style HTTPS origin).
       CORS_ORIGIN: http://localhost:8080
       # Direct host publish — do not trust X-Forwarded-For from clients.
@@ -70,7 +74,7 @@ services:
       DB_PORT: "5432"
       PORT: "3001"
       WORKER_PORT: "3001"
-      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      RABBITMQ_URL: amqp://checkout:checkout@rabbitmq:5672
     ports:
       - "3001:3001"
     depends_on:

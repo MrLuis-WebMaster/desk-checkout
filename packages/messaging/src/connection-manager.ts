@@ -29,6 +29,11 @@ export type RabbitConnectionManagerOptions = {
   };
 };
 
+type ConsumerRegistration = {
+  queues: QueueTriplet;
+  handler: (payload: unknown, raw: ConsumeMessage) => Promise<void>;
+};
+
 const noopLogger = {
   info: () => undefined,
   error: () => undefined,
@@ -37,6 +42,7 @@ const noopLogger = {
 /**
  * Background reconnecting connection. `start()` never throws; publish fails
  * with `RabbitUnavailableError` until a confirm channel exists.
+ * Consumer registrations survive reconnects.
  */
 export class RabbitConnectionManager {
   private readonly url: string;
@@ -48,6 +54,7 @@ export class RabbitConnectionManager {
   private stopped = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private connecting: Promise<void> | null = null;
+  private readonly consumers: ConsumerRegistration[] = [];
 
   constructor(options: RabbitConnectionManagerOptions) {
     this.url = options.url;
@@ -71,6 +78,7 @@ export class RabbitConnectionManager {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+    this.consumers.length = 0;
     const channel = this.channel;
     const connection = this.connection;
     this.channel = null;
@@ -112,25 +120,70 @@ export class RabbitConnectionManager {
     await channel.waitForConfirms();
   }
 
+  /**
+   * Registers a consumer. The registration is kept and re-bound after every
+   * successful reconnect. Replacing the handler for an already-bound queue
+   * updates the registration in place without attaching a second consumer.
+   */
   async consume(
     queues: QueueTriplet,
     handler: (payload: unknown, raw: ConsumeMessage) => Promise<void>,
   ): Promise<void> {
-    const channel = this.channel;
-    if (!channel) {
-      throw new RabbitUnavailableError();
+    const existing = this.consumers.find((c) => c.queues.main === queues.main);
+    if (existing) {
+      existing.handler = handler;
+      if (this.channel) {
+        return;
+      }
+      void this.ensureConnected();
+      return;
     }
+    const registration: ConsumerRegistration = { queues, handler };
+    this.consumers.push(registration);
+    if (!this.channel) {
+      // Will bind after connectOnce completes.
+      void this.ensureConnected();
+      return;
+    }
+    await this.bindConsumer(this.channel, registration);
+  }
+
+  private async bindConsumer(
+    channel: ConfirmChannel,
+    registration: ConsumerRegistration,
+  ): Promise<void> {
     await channel.prefetch(1);
     await channel.consume(
-      queues.main,
+      registration.queues.main,
       (message) => {
         if (!message) {
           return;
         }
-        void this.dispatch(channel, queues, message, handler);
+        void this.dispatch(
+          channel,
+          registration.queues,
+          message,
+          registration.handler,
+        );
       },
       { noAck: false },
     );
+  }
+
+  private async rebindConsumers(channel: ConfirmChannel): Promise<void> {
+    for (const registration of this.consumers) {
+      try {
+        await this.bindConsumer(channel, registration);
+        this.logger.info("rabbit_consumer_rebound", {
+          queue: registration.queues.main,
+        });
+      } catch (error) {
+        this.logger.error("rabbit_consumer_rebind_failed", {
+          queue: registration.queues.main,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
   }
 
   private async dispatch(
@@ -181,9 +234,6 @@ export class RabbitConnectionManager {
               ? retryError.message
               : String(retryError),
         });
-        // Do not requeue forever — nack without requeue dumps to nowhere if
-        // publish to retry/DLQ failed; prefer nack(false) so the broker drops
-        // or we at least stop the infinite loop. Prefer nack without requeue.
         try {
           channel.nack(message, false, false);
         } catch {
@@ -237,6 +287,7 @@ export class RabbitConnectionManager {
       this.connection = connection;
       this.channel = channel;
       this.logger.info("rabbit_connected");
+      await this.rebindConsumers(channel);
     } catch (error) {
       this.logger.error("rabbit_connect_failed", {
         error: error instanceof Error ? error.message : String(error),
