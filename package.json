@@ -2,12 +2,16 @@
   "name": "checkout-app",
   "private": true,
   "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:cov": "turbo run test:cov",
+    "audit:ci": "pnpm audit --audit-level=high",
     "db:migrate": "pnpm --filter @checkout/api db:migrate",
     "db:seed": "pnpm --filter @checkout/api db:seed"
   },

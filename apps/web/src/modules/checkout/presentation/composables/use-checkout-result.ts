@@ -68,7 +68,14 @@ export function useCheckoutResult() {
   }
 
   onMounted(async () => {
-    const transactionId = String(route.params.transactionId ?? "");
+    const params = route.params as Record<string, string | string[] | undefined>;
+    const param = params.transactionId;
+    const transactionId =
+      typeof param === "string"
+        ? param
+        : Array.isArray(param)
+          ? (param[0] ?? "")
+          : "";
     const providerId =
       typeof route.query.id === "string" ? route.query.id.trim() : "";
 

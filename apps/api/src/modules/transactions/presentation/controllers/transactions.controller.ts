@@ -20,7 +20,9 @@ import {
   ApiTags,
   ApiUnprocessableEntityResponse,
 } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { ApiErrorCode } from "@checkout/contracts";
+import { STRICT_THROTTLE } from "#shared/infrastructure/http/throttle-limits.js";
 import { throwApiError } from "#shared/presentation/http/throw-api-error.js";
 import {
   ApiFailureDto,
@@ -59,6 +61,7 @@ export class TransactionsController {
   ) {}
 
   @Post()
+  @Throttle(STRICT_THROTTLE)
   @ApiOperation({ summary: "Crear una transacción pendiente" })
   @ApiCreatedResponse({ schema: apiSuccessSchema(TransactionResponseDto) })
   @ApiNotFoundResponse({ type: ApiFailureDto })
@@ -76,6 +79,7 @@ export class TransactionsController {
   }
 
   @Get(":id")
+  @Throttle(STRICT_THROTTLE)
   @ApiOperation({ summary: "Obtener una transacción" })
   @ApiOkResponse({ schema: apiSuccessSchema(TransactionResponseDto) })
   @ApiNotFoundResponse({ type: ApiFailureDto })
@@ -107,6 +111,7 @@ export class TransactionsController {
   }
 
   @Post(":id/pay")
+  @Throttle(STRICT_THROTTLE)
   @ApiOperation({ summary: "Pay a pending transaction with a card token" })
   @ApiHeader({ name: "Idempotency-Key", required: true })
   @ApiOkResponse({ schema: apiSuccessSchema(TransactionResponseDto) })
@@ -128,6 +133,7 @@ export class TransactionsController {
   }
 
   @Post(":id/sync")
+  @Throttle(STRICT_THROTTLE)
   @ApiOperation({ summary: "Sync a Wompi widget payment into our transaction" })
   @ApiHeader({ name: "Idempotency-Key", required: true })
   @ApiOkResponse({ schema: apiSuccessSchema(TransactionResponseDto) })

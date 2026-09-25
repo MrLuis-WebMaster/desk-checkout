@@ -76,9 +76,18 @@ describe("WompiHttpPaymentGateway (worker)", () => {
     );
   });
 
-  it("maps non-OK responses to PaymentGatewayError", async () => {
+  it("maps non-OK responses without leaking Authorization secrets", async () => {
     fetchMock.mockResolvedValueOnce(new Response("down", { status: 503 }));
-    await expect(gateway.getPaymentStatus("x")).rejects.toThrow(/status 503/);
+    try {
+      await gateway.getPaymentStatus("x");
+      fail("expected error");
+    } catch (error) {
+      expect(error).toMatchObject({ message: expect.stringMatching(/status 503/) });
+      const text =
+        error instanceof Error ? `${error.message}\n${error.stack}` : String(error);
+      expect(text).not.toContain("prv_test");
+      expect(text).not.toContain("Authorization");
+    }
   });
 
   it("rejects payloads without a transaction id", async () => {
