@@ -34,4 +34,8 @@ API (and worker filters) redact known secrets from log strings: `WOMPI_PRIVATE_K
 
 ## Residual risk: guest UUID access
 
-`GET /transactions/:id` is unauthenticated and keyed only by transaction UUID. Anyone who obtains a UUID can read that order’s status payload. Treat UUIDs as secrets (do not log them in public analytics, do not put them in shareable URLs beyond the checkout flow). See [ADR 0003](adr/0003-guest-uuid-access.md).
+`GET /transactions/:id`, `GET /customers/:id`, and `GET /deliveries/:id` are unauthenticated and keyed only by UUID. Anyone who obtains a UUID can read that guest payload (order status, or customer/delivery PII). There is no list endpoint. Treat UUIDs as secrets (do not log them in public analytics, do not put them in shareable URLs beyond the checkout flow). See [ADR 0003](adr/0003-guest-uuid-access.md). Sensitive writes and these GETs use the stricter throttle limit.
+
+## Swagger
+
+OpenAPI UI is served at `/docs` when `ENABLE_SWAGGER` is unset/`1`/`true` (default). Set `ENABLE_SWAGGER=0` (or `false`) to disable docs and the Swagger CSP relaxations in production if you do not need a public contract URL.

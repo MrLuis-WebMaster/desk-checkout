@@ -30,6 +30,7 @@ import {
   type CustomerDeliveryValues,
 } from "@/modules/checkout/presentation/validation/customer-delivery.schema";
 import { createSharedCreate } from "@/modules/checkout/presentation/ensure-pending-transaction";
+import { isCreateStillCurrent } from "@/modules/checkout/presentation/pending-create-freshness";
 import type { ScreenResult } from "@/shared/application/results/screen-result";
 
 function linesFingerprint(
@@ -163,7 +164,11 @@ export function useCheckoutPage() {
     return `${window.location.origin}/checkout/result/${transactionId}`;
   }
 
+  /** Bumped on invalidate so in-flight creates discard stale success. */
+  let createEpoch = 0;
+
   function invalidatePendingOrder() {
+    createEpoch += 1;
     transaction.value = null;
     clearPending();
   }
@@ -193,6 +198,9 @@ export function useCheckoutPage() {
     if (result.status === "not_found") {
       return "That product is no longer available.";
     }
+    if (result.status === "stale") {
+      return "Checkout changed while creating the order. Try again.";
+    }
     return "Couldn't create the order. Check the form and try again.";
   }
 
@@ -202,6 +210,12 @@ export function useCheckoutPage() {
         ? { status: "ok" as const, value: transaction.value }
         : null,
     create: async () => {
+      const epochAtStart = createEpoch;
+      const fingerprintAtStart = cartFingerprint.value;
+      const linesAtStart = cartLines.value.map((line) => ({
+        productId: line.productId,
+        quantity: line.quantity,
+      }));
       const draftValues = draft.value;
       const customer = {
         fullName: (fullName.value || draftValues?.fullName || "").trim(),
@@ -215,16 +229,23 @@ export function useCheckoutPage() {
         city: (city.value || draftValues?.city || "BOG") as ShippingCityCode,
       };
       const result = await createTransaction({
-        items: cartLines.value.map((line) => ({
-          productId: line.productId,
-          quantity: line.quantity,
-        })),
+        items: linesAtStart,
         customer,
         delivery,
       });
+      if (
+        !isCreateStillCurrent({
+          epochAtStart,
+          epochNow: createEpoch,
+          fingerprintAtStart,
+          fingerprintNow: cartFingerprint.value,
+        })
+      ) {
+        return { status: "stale" as const };
+      }
       if (result.status === "ok") {
         transaction.value = result.value;
-        rememberPending(result.value.id, cartFingerprint.value);
+        rememberPending(result.value.id, fingerprintAtStart);
       }
       return result;
     },

@@ -9,11 +9,12 @@ import { setupSwagger } from "#shared/presentation/swagger/setup-swagger.js";
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+  const enableSwagger = env.ENABLE_SWAGGER;
 
   applyApiHttpHardening(app, {
     nodeEnv: env.NODE_ENV,
     trustProxyEnv: process.env.TRUST_PROXY,
-    enableSwaggerCsp: true,
+    enableSwaggerCsp: enableSwagger,
   });
 
   app.enableCors({
@@ -32,7 +33,9 @@ async function bootstrap() {
   app.useGlobalFilters(new ApiExceptionFilter(httpAdapterHost));
   app.useGlobalInterceptors(new ApiSuccessInterceptor());
 
-  setupSwagger(app);
+  if (enableSwagger) {
+    setupSwagger(app);
+  }
 
   await app.listen(env.PORT);
 }

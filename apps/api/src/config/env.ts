@@ -25,6 +25,11 @@ export const apiEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
+  /** When false, skip `/docs` and Swagger CSP relaxations. Default true for the public OpenAPI deliverable. */
+  ENABLE_SWAGGER: z
+    .enum(["0", "1", "true", "false"])
+    .optional()
+    .transform((value) => value === undefined || value === "1" || value === "true"),
   WOMPI_BASE_URL: z.string().default(""),
   WOMPI_PUBLIC_KEY: z.string().default(""),
   WOMPI_PRIVATE_KEY: z.string().default(""),
@@ -76,6 +81,7 @@ const API_ENV_KEYS = [
   "DB_PASSWORD",
   "DB_NAME",
   "NODE_ENV",
+  "ENABLE_SWAGGER",
   "WOMPI_BASE_URL",
   "WOMPI_PUBLIC_KEY",
   "WOMPI_PRIVATE_KEY",

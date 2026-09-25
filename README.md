@@ -65,7 +65,7 @@ After schema changes, run `pnpm db:migrate` and `pnpm db:seed` again.
 
 ### API docs (Swagger)
 
-OpenAPI UI is served at **`/docs`** in every environment (including production). Locally: [http://localhost:3000/docs](http://localhost:3000/docs). After deploy: `https://<api-host>/docs` (replace with the public API host). No Postman collection is maintained.
+OpenAPI UI is served at **`/docs`** when `ENABLE_SWAGGER` is unset/`1`/`true` (default, including production). Set `ENABLE_SWAGGER=0` to disable docs and Swagger CSP. Locally: [http://localhost:3000/docs](http://localhost:3000/docs). After deploy: `https://<api-host>/docs` (replace with the public API host). No Postman collection is maintained.
 
 ## Environment
 
