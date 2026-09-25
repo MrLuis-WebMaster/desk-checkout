@@ -32,6 +32,8 @@ services:
       DB_HOST: postgres
       DB_PORT: "5432"
       PORT: "3000"
+      # Compose web is at :8080 (env_file defaults to a Coolify-style HTTPS origin).
+      CORS_ORIGIN: http://localhost:8080
       # Direct host publish — do not trust X-Forwarded-For from clients.
       TRUST_PROXY: "false"
     ports:
