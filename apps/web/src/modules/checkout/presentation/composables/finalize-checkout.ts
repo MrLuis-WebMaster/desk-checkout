@@ -11,5 +11,5 @@ export function finalizeCheckout(status: TransactionStatus): void {
     return;
   }
   useCartStore().clear();
-  useCheckoutStore().clearPending();
+  useCheckoutStore().reset();
 }

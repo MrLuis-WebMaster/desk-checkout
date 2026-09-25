@@ -24,7 +24,10 @@ import {
 } from "@/modules/checkout/presentation/validation/card-payment.schema";
 
 export function useCardPayment(options: {
-  transactionId: () => string;
+  resolveTransactionId: () => Promise<
+    | { status: "ok"; transactionId: string }
+    | { status: "error"; message: string }
+  >;
   paymentConfig: () => PaymentConfigDto;
   onPaid: (transaction: TransactionDto) => void;
 }) {
@@ -94,6 +97,13 @@ export function useCardPayment(options: {
     errorMessage.value = "";
     loading.value = true;
     try {
+      const resolved = await options.resolveTransactionId();
+      if (resolved.status !== "ok") {
+        errorMessage.value = resolved.message;
+        return;
+      }
+      const transactionId = resolved.transactionId;
+
       const tokenized = await tokenizeWompiCard(
         options.paymentConfig().publicKey,
         {
@@ -110,7 +120,7 @@ export function useCardPayment(options: {
       }
       const paymentConfig = options.paymentConfig();
       const result = await payTransaction(
-        options.transactionId(),
+        transactionId,
         {
           paymentMethodToken: tokenized.token,
           acceptanceToken: paymentConfig.acceptanceToken,
@@ -121,9 +131,7 @@ export function useCardPayment(options: {
       );
       if (result.status !== "ok") {
         if (result.status === "out_of_stock") {
-          errorMessage.value = postChargeOutOfStockMessage(
-            options.transactionId(),
-          );
+          errorMessage.value = postChargeOutOfStockMessage(transactionId);
           return;
         }
         errorMessage.value =

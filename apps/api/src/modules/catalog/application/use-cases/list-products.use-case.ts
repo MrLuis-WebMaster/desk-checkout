@@ -35,6 +35,18 @@ export class ListProductsUseCase {
   async execute(
     query: ListProductsQuery,
   ): Promise<Result<ProductPageDto, InvalidProductCursorError>> {
+    if (query.ids?.length) {
+      if (
+        query.after ||
+        query.before ||
+        query.page !== undefined ||
+        query.q
+      ) {
+        return err(new InvalidProductCursorError());
+      }
+      return ok(await this.productReader.list(query));
+    }
+
     if (query.after && query.before) {
       return err(new InvalidProductCursorError());
     }

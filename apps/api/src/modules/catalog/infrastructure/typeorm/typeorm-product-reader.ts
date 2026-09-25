@@ -50,6 +50,10 @@ export class TypeOrmProductReader extends ProductReader {
   }
 
   async list(query: ListProductsQuery): Promise<ProductPageDto> {
+    if (query.ids?.length) {
+      return this.listByIds(query.ids);
+    }
+
     // Cursor mode is authoritative when after/before is present (use case
     // rejects mixing those with `page`).
     const goingBackward = Boolean(query.before);
@@ -117,6 +121,36 @@ export class TypeOrmProductReader extends ProductReader {
       total,
       nextCursor,
       prevCursor,
+    };
+  }
+
+  private async listByIds(ids: string[]): Promise<ProductPageDto> {
+    const uniqueIds = [...new Set(ids)];
+    const rows = await joinAvailableStock(
+      this.products.createQueryBuilder("product"),
+    )
+      .select([
+        "product.id AS id",
+        "product.name AS name",
+        "product.price AS price",
+        "product.image_url AS \"imageUrl\"",
+        AVAILABLE_STOCK_COLUMN,
+      ])
+      .where("product.id IN (:...ids)", { ids: uniqueIds })
+      .getRawMany<ProductListRow>();
+
+    const byId = new Map(rows.map((row) => [row.id, mapSummaryRow(row)]));
+    const items = uniqueIds.flatMap((id) => {
+      const item = byId.get(id);
+      return item ? [item] : [];
+    });
+
+    return {
+      items,
+      pageSize: items.length,
+      total: items.length,
+      nextCursor: null,
+      prevCursor: null,
     };
   }
 

@@ -5,8 +5,11 @@ import { useCardPayment } from "@/modules/checkout/presentation/composables/use-
 import { UiAlert, UiButton, UiField, UiInput } from "@/shared/ui";
 
 const props = defineProps<{
-  transactionId: string;
   paymentConfig: PaymentConfigDto;
+  resolveTransactionId: () => Promise<
+    | { status: "ok"; transactionId: string }
+    | { status: "error"; message: string }
+  >;
 }>();
 
 const emit = defineEmits<{
@@ -28,7 +31,7 @@ const {
   cvcMaxLength,
   onSubmit,
 } = useCardPayment({
-  transactionId: () => props.transactionId,
+  resolveTransactionId: () => props.resolveTransactionId(),
   paymentConfig: () => props.paymentConfig,
   onPaid: (transaction) => emit("paid", transaction),
 });

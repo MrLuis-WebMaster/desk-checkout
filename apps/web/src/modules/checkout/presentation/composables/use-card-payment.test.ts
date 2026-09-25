@@ -52,14 +52,24 @@ describe("useCardPayment", () => {
     acceptPersonalAuth: "pda",
   };
 
+  const resolveTransactionId = vi.fn(async () => ({
+    status: "ok" as const,
+    transactionId: "tx-1",
+  }));
+
   beforeEach(() => {
     tokenizeWompiCard.mockReset();
     payTransaction.mockReset();
     finalizeCheckout.mockReset();
     onPaid.mockReset();
+    resolveTransactionId.mockReset();
+    resolveTransactionId.mockResolvedValue({
+      status: "ok",
+      transactionId: "tx-1",
+    });
   });
 
-  it("tokenizes, pays, finalizes, and notifies on approval", async () => {
+  it("resolves a transaction id before tokenizing and paying", async () => {
     tokenizeWompiCard.mockResolvedValue({ ok: true, token: "tok_1" });
     payTransaction.mockResolvedValue({
       status: "ok",
@@ -67,13 +77,14 @@ describe("useCardPayment", () => {
     });
 
     const card = useCardPayment({
-      transactionId: () => "tx-1",
+      resolveTransactionId,
       paymentConfig: () => paymentConfig as never,
       onPaid,
     });
 
     await card.onSubmit();
 
+    expect(resolveTransactionId).toHaveBeenCalledTimes(1);
     expect(tokenizeWompiCard).toHaveBeenCalledWith("pub_test", {
       number: "4242424242424242",
       cvc: "123",
@@ -97,6 +108,24 @@ describe("useCardPayment", () => {
     expect(card.loading.value).toBe(false);
   });
 
+  it("surfaces resolve failures without tokenizing", async () => {
+    resolveTransactionId.mockResolvedValue({
+      status: "error",
+      message: "Couldn't create the order.",
+    });
+
+    const card = useCardPayment({
+      resolveTransactionId,
+      paymentConfig: () => paymentConfig as never,
+      onPaid,
+    });
+    await card.onSubmit();
+
+    expect(tokenizeWompiCard).not.toHaveBeenCalled();
+    expect(payTransaction).not.toHaveBeenCalled();
+    expect(card.errorMessage.value).toMatch(/Couldn't create/i);
+  });
+
   it("surfaces tokenize failures without charging", async () => {
     tokenizeWompiCard.mockResolvedValue({
       ok: false,
@@ -104,7 +133,7 @@ describe("useCardPayment", () => {
     });
 
     const card = useCardPayment({
-      transactionId: () => "tx-1",
+      resolveTransactionId,
       paymentConfig: () => paymentConfig as never,
       onPaid,
     });
@@ -119,7 +148,7 @@ describe("useCardPayment", () => {
     payTransaction.mockResolvedValue({ status: "out_of_stock" });
 
     const card = useCardPayment({
-      transactionId: () => "tx-1",
+      resolveTransactionId,
       paymentConfig: () => paymentConfig as never,
       onPaid,
     });
@@ -137,7 +166,7 @@ describe("useCardPayment", () => {
     });
 
     const card = useCardPayment({
-      transactionId: () => "tx-1",
+      resolveTransactionId,
       paymentConfig: () => paymentConfig as never,
       onPaid,
     });

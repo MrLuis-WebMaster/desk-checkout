@@ -7,7 +7,14 @@ pnpm test       # unit tests (turbo)
 pnpm test:cov   # coverage with an 80% line/statement gate per package
 ```
 
-`pnpm test:cov` enforces **80% lines and statements**. Branch coverage is not a hard gate. Coverage exclusions (ORM entities, Nest modules, migrations, `main.ts`, DTOs, and similar) live in each package’s Jest or Vitest config — for example `apps/api/jest.config.cjs`, `apps/worker/jest.config.cjs`, `packages/settlement/jest.config.cjs`, and `apps/web/vite.config.ts`. Point readers there instead of duplicating exclude tables in this guide.
+`pnpm test:cov` enforces **80% lines and statements**. Branch coverage is not a hard gate.
+
+| Package | Runner |
+| --- | --- |
+| `apps/api`, `apps/worker`, `packages/*` | **Jest** (`jest.config.cjs`) |
+| `apps/web` | **Vitest** (`vite.config.ts`; `.vue` files stay outside coverage) |
+
+Coverage exclusions (ORM entities, Nest modules, migrations, `main.ts`, DTOs, and similar) live in each package’s Jest or Vitest config — for example `apps/api/jest.config.cjs`, `apps/worker/jest.config.cjs`, `packages/settlement/jest.config.cjs`, and `apps/web/vite.config.ts`. Point readers there instead of duplicating exclude tables in this guide. Latest percentages are copied into the README coverage table after a full `pnpm test:cov` run.
 
 CI runs lint, build, and `test:cov` on the `quality` job (`.github/workflows/ci.yml`), plus Docker image builds and `nginx -t` on the web image.
 

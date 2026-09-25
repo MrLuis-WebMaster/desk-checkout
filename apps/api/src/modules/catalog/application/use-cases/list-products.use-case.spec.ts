@@ -142,4 +142,54 @@ describe("ListProductsUseCase", () => {
       page: 3,
     });
   });
+
+  it("allows ids-only queries without cursors", async () => {
+    const useCase = new ListProductsUseCase(productReader);
+    const ids = [PRODUCT_ID, "22222222-2222-4222-8222-222222222222"];
+
+    const result = await useCase.execute({
+      pageSize: 10,
+      sort: "name",
+      order: "asc",
+      ids,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(productReader.list).toHaveBeenCalledWith({
+      pageSize: 10,
+      sort: "name",
+      order: "asc",
+      ids,
+    });
+  });
+
+  it("rejects mixing ids with page", async () => {
+    const useCase = new ListProductsUseCase(productReader);
+
+    const result = await useCase.execute({
+      pageSize: 10,
+      sort: "name",
+      order: "asc",
+      page: 1,
+      ids: [PRODUCT_ID],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(productReader.list).not.toHaveBeenCalled();
+  });
+
+  it("rejects mixing ids with q", async () => {
+    const useCase = new ListProductsUseCase(productReader);
+
+    const result = await useCase.execute({
+      pageSize: 10,
+      sort: "name",
+      order: "asc",
+      q: "usb",
+      ids: [PRODUCT_ID],
+    });
+
+    expect(result.ok).toBe(false);
+    expect(productReader.list).not.toHaveBeenCalled();
+  });
 });

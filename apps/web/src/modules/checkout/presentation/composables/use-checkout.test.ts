@@ -28,4 +28,30 @@ describe("useCheckout", () => {
     checkout.reset();
     expect(checkout.pendingTransactionId.value).toBeNull();
   });
+
+  it("persists a delivery draft without card fields", () => {
+    const checkout = useCheckout();
+    checkout.saveDraft({
+      fullName: "Ada",
+      email: "ada@example.com",
+      phone: "300",
+      addressLine: "Calle 1",
+      city: "BOG",
+      shippingMethodId: "ship-1",
+    });
+    expect(checkout.draft.value).toEqual({
+      fullName: "Ada",
+      email: "ada@example.com",
+      phone: "300",
+      addressLine: "Calle 1",
+      city: "BOG",
+      shippingMethodId: "ship-1",
+    });
+    expect(checkout.draft.value).not.toHaveProperty("cardNumber");
+    expect(checkout.draft.value).not.toHaveProperty("cvc");
+    expect(checkout.draft.value).not.toHaveProperty("expMonth");
+
+    checkout.clearDraft();
+    expect(checkout.draft.value).toBeNull();
+  });
 });

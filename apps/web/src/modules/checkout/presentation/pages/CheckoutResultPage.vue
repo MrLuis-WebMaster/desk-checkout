@@ -11,6 +11,7 @@ const {
   view,
   toneClass,
   iconWrapClass,
+  purchasedCta,
   goCatalog,
 } = useCheckoutResult();
 </script>
@@ -95,6 +96,13 @@ const {
         >
           {{ view.secondaryLabel }}
         </UiButton>
+        <RouterLink
+          v-if="purchasedCta"
+          :to="purchasedCta.to"
+          class="block text-center text-sm font-medium text-ink underline"
+        >
+          {{ purchasedCta.label }}
+        </RouterLink>
       </div>
     </template>
   </main>
