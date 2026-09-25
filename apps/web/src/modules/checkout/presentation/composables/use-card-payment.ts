@@ -28,7 +28,7 @@ export function useCardPayment(options: {
   paymentConfig: () => PaymentConfigDto;
   onPaid: (transaction: TransactionDto) => void;
 }) {
-  const { defineField, handleSubmit, errors, setFieldValue } = useForm({
+  const { defineField, handleSubmit, errors, setFieldValue } = useForm<CardPaymentValues>({
     validationSchema: cardPaymentSchema,
     initialValues: {
       cardHolder: "",
@@ -38,7 +38,7 @@ export function useCardPayment(options: {
       cvc: "",
       installments: "1",
       accepted: false,
-    } satisfies CardPaymentValues,
+    },
   });
 
   const [cardHolder] = defineField("cardHolder");
@@ -63,7 +63,7 @@ export function useCardPayment(options: {
   });
 
   watch(installments, (value) => {
-    const digits = digitsOnly(value ?? "").slice(0, 2);
+    const digits = digitsOnly(String(value ?? "")).slice(0, 2);
     if (digits !== value) {
       setFieldValue("installments", digits || "", false);
     }

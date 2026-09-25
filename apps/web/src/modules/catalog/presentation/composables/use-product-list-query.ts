@@ -39,7 +39,7 @@ export function useProductListQuery() {
       order: current.order,
       after: current.after,
       before: current.before,
-      page: current.page > 1 ? String(current.page) : undefined,
+      page: (current.page ?? 0) > 1 ? String(current.page) : undefined,
       ...patch,
     };
 

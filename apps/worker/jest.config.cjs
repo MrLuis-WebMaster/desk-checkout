@@ -10,6 +10,7 @@ module.exports = {
     "src/modules/**/application/**/*.ts",
     "src/modules/**/presentation/**/*.ts",
     "src/modules/settlement/infrastructure/**/*.ts",
+    "src/shared/**/*.ts",
     "src/config/**/*.ts",
     "!src/**/*.spec.ts",
     "!src/**/*.module.ts",

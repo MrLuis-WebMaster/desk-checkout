@@ -1,0 +1,81 @@
+# Prod-like smoke stack. Ports pinned (D5):
+# postgres host 5434, api 3000, worker 3001, web 8080.
+# Keep a single API replica while migrations run (entrypoint migrates then starts).
+# TRUST_PROXY stays off here: API port is published directly (no reverse proxy).
+# Behind Coolify/nginx set TRUST_PROXY=1 (or hop count) and do not expose API without a proxy.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: checkout
+      POSTGRES_PASSWORD: checkout
+      POSTGRES_DB: checkout
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U checkout -d checkout"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file:
+      - deploy/env.production.example
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      PORT: "3000"
+      # Compose web is at :8080 (env_file defaults to a Coolify-style HTTPS origin).
+      CORS_ORIGIN: http://localhost:8080
+      # Direct host publish — do not trust X-Forwarded-For from clients.
+      TRUST_PROXY: "false"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # Single instance: TypeORM migration:run is not safe under concurrent replicas.
+    # In-memory throttler is also per-process — keep one API replica in Coolify unless Redis is added.
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    env_file:
+      - deploy/env.production.example
+    environment:
+      NODE_ENV: production
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      PORT: "3001"
+      WORKER_PORT: "3001"
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      # Wait until API finished dist-only migrate and /health responds.
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: http://localhost:3000
+    ports:
+      - "8080:80"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_prod_data:

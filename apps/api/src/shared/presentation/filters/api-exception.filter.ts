@@ -6,6 +6,10 @@ import {
   Logger,
 } from "@nestjs/common";
 import { HttpAdapterHost } from "@nestjs/core";
+import {
+  redactSecrets,
+  safeErrorStack,
+} from "#shared/infrastructure/logging/redact-secrets.js";
 import { mapExceptionToApiError } from "../mappers/api-error.mapper.js";
 
 @Catch()
@@ -21,8 +25,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
     if (!(exception instanceof HttpException) || status >= 500) {
       this.logger.error(
-        body.error.message,
-        exception instanceof Error ? exception.stack : undefined,
+        redactSecrets(body.error.message),
+        safeErrorStack(exception),
       );
     }
 
