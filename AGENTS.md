@@ -14,6 +14,12 @@ El arranque completo está en `README.md`:
 
 Vuelve a correr `pnpm db:migrate` y `pnpm db:seed` después de cambiar el esquema.
 
-## Complex changes
+## Features and plans
 
-Para un feature o un cambio de varios archivos, delega en este orden: `planner`, `implementer`, `verifier`. Están en `.cursor/agents/`. El verifier no edita: devuelve lo que falta y el implementer lo corrige.
+Solo el agente principal delega, una vez y en serie. Espera a que uno termine antes de lanzar el siguiente. No abras copias en paralelo de la misma tarea.
+
+Si este chat ya es `planner`, `implementer` o `verifier`, haz ese trabajo y no lances a ninguno de los tres.
+
+- Feature o cambio de varios archivos, sin plan aprobado: `planner`, luego `implementer`, luego `verifier`.
+- Ejecutar un plan ya aprobado: `implementer`, luego `verifier`.
+- Un solo archivo: hazlo en este chat, sin esos agentes.

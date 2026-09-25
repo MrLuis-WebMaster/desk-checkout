@@ -41,7 +41,7 @@ PostgreSQL listens on `localhost:5433` (container port 5432). Database, user, an
 
 ### Checkout data API
 
-- `GET /shipping-methods?region=BOG` — active shipping methods with their regional fee
+- `GET /shipping-methods?city=BOG` — active shipping methods with their city fee
 - `GET /checkout/settings` — current base fee
 - `POST /transactions` — creates a guest transaction in `PENDING` status
 - `GET /transactions/:id` — returns the transaction with pricing snapshots
@@ -50,9 +50,18 @@ The base fee and shipping rates are stored in PostgreSQL and seeded
 idempotently. All money fields (`product.price`, quote `amount`, settings
 `baseFee`, and transaction snapshots) use the same integer COP units.
 Creating a transaction snapshots the product name and price,
-base fee, delivery fee, and calculated total. Phase 3 only checks current
-stock; reservation/decrement and the associated TOCTOU protection are deferred
-to the payment phase. Request idempotency is also deferred.
+base fee, delivery fee, and calculated total. Creating a transaction checks
+current stock only. Payment locks inventory and decrements it when the charge
+is approved.
 Guest `GET /transactions/:id` is keyed by UUID only (no auth yet).
+
+### Payment API
+
+Sandbox keys come from the [Wompi dashboard](https://comercios.wompi.co/). Copy `WOMPI_*` from `.env.example` into `.env`.
+
+- `GET /payments/config` — public key plus fresh acceptance tokens (no private key)
+- `POST /transactions/:id/pay` — card token body and required `Idempotency-Key` header
+
+A transaction charges one product unit. Stock decreases only when Wompi reports `APPROVED`. The same idempotency key and body replay the stored response and do not create a second charge. Vue checkout and Wompi webhooks stay in later phases. The cart quantity in the browser is not sent to this API yet.
 
 All JSON responses use `{ ok: true, data }` or `{ ok: false, error }`.

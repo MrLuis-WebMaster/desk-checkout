@@ -22,8 +22,8 @@ import { GetCheckoutSettingsUseCase } from "../../application/use-cases/get-chec
 import { ListShippingQuotesUseCase } from "../../application/use-cases/list-shipping-quotes.use-case.js";
 import {
   CheckoutSettingsResponseDto,
+  ShippingCityQueryDto,
   ShippingMethodQuoteResponseDto,
-  ShippingRegionQueryDto,
 } from "../dto/shipping.dto.js";
 
 @ApiTags("shipping")
@@ -40,12 +40,20 @@ export class ShippingController {
   ) {}
 
   @Get("shipping-methods")
-  @ApiOperation({ summary: "Listar métodos y tarifas de envío por región" })
+  @ApiOperation({ summary: "List shipping methods and rates by city" })
   @ApiOkResponse({
     schema: apiSuccessArraySchema(ShippingMethodQuoteResponseDto),
   })
-  async list(@Query() query: ShippingRegionQueryDto) {
-    const result = await this.listShippingQuotes.execute(query.region);
+  async list(@Query() query: ShippingCityQueryDto) {
+    const city = query.city ?? query.region;
+    if (!city) {
+      throwApiError(
+        ApiErrorCode.ValidationError,
+        "city must be one of the following values: BOG, MED, CALI, OTHER",
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+    const result = await this.listShippingQuotes.execute(city);
     if (!result.ok) {
       throwApiError(
         ApiErrorCode.Unexpected,
@@ -57,7 +65,7 @@ export class ShippingController {
   }
 
   @Get("checkout/settings")
-  @ApiOperation({ summary: "Obtener configuración de checkout" })
+  @ApiOperation({ summary: "Get checkout settings" })
   @ApiOkResponse({ schema: apiSuccessSchema(CheckoutSettingsResponseDto) })
   @ApiServiceUnavailableResponse({ type: ApiFailureDto })
   async settings() {

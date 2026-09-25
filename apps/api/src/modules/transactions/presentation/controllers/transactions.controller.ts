@@ -2,14 +2,17 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpStatus,
   Param,
   Post,
 } from "@nestjs/common";
 import {
+  ApiBadRequestResponse,
   ApiConflictResponse,
   ApiCreatedResponse,
   ApiExtraModels,
+  ApiHeader,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -25,20 +28,34 @@ import {
 } from "#shared/presentation/swagger/api-envelope.js";
 import { CreateTransactionUseCase } from "../../application/use-cases/create-transaction.use-case.js";
 import { GetTransactionUseCase } from "../../application/use-cases/get-transaction.use-case.js";
+import { GetWidgetCheckoutSessionUseCase } from "../../application/use-cases/get-widget-checkout-session.use-case.js";
+import { PayTransactionUseCase } from "../../application/use-cases/pay-transaction.use-case.js";
+import { SyncProviderPaymentUseCase } from "../../application/use-cases/sync-provider-payment.use-case.js";
 import {
   CreateTransactionDto,
+  PayTransactionDto,
+  SyncProviderPaymentDto,
   TransactionParamsDto,
   TransactionResponseDto,
+  WidgetCheckoutSessionResponseDto,
 } from "../dto/transaction.dto.js";
 import { toCreateTransactionRequest } from "../mappers/transaction.mapper.js";
+import { requireIdempotencyKey } from "../idempotency-key.js";
 
 @ApiTags("transactions")
-@ApiExtraModels(TransactionResponseDto, ApiFailureDto)
+@ApiExtraModels(
+  TransactionResponseDto,
+  WidgetCheckoutSessionResponseDto,
+  ApiFailureDto,
+)
 @Controller("transactions")
 export class TransactionsController {
   constructor(
     private readonly createTransaction: CreateTransactionUseCase,
     private readonly getTransaction: GetTransactionUseCase,
+    private readonly getWidgetCheckoutSession: GetWidgetCheckoutSessionUseCase,
+    private readonly payTransaction: PayTransactionUseCase,
+    private readonly syncProviderPayment: SyncProviderPaymentUseCase,
   ) {}
 
   @Post()
@@ -73,6 +90,63 @@ export class TransactionsController {
     }
     return result.value;
   }
+
+  @Get(":id/widget-session")
+  @ApiOperation({ summary: "Build a Wompi widget checkout session" })
+  @ApiOkResponse({
+    schema: apiSuccessSchema(WidgetCheckoutSessionResponseDto),
+  })
+  @ApiNotFoundResponse({ type: ApiFailureDto })
+  @ApiUnprocessableEntityResponse({ type: ApiFailureDto })
+  async widgetSession(@Param() params: TransactionParamsDto) {
+    const result = await this.getWidgetCheckoutSession.execute(params.id);
+    if (!result.ok) {
+      throwTransactionError(result.error.code);
+    }
+    return result.value;
+  }
+
+  @Post(":id/pay")
+  @ApiOperation({ summary: "Pay a pending transaction with a card token" })
+  @ApiHeader({ name: "Idempotency-Key", required: true })
+  @ApiOkResponse({ schema: apiSuccessSchema(TransactionResponseDto) })
+  @ApiBadRequestResponse({ type: ApiFailureDto })
+  @ApiNotFoundResponse({ type: ApiFailureDto })
+  @ApiConflictResponse({ type: ApiFailureDto })
+  @ApiUnprocessableEntityResponse({ type: ApiFailureDto })
+  async pay(
+    @Param() params: TransactionParamsDto,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: PayTransactionDto,
+  ) {
+    const key = requireIdempotencyKey(idempotencyKey);
+    const result = await this.payTransaction.execute(params.id, key, body);
+    if (!result.ok) {
+      throwTransactionError(result.error.code);
+    }
+    return result.value;
+  }
+
+  @Post(":id/sync")
+  @ApiOperation({ summary: "Sync a Wompi widget payment into our transaction" })
+  @ApiHeader({ name: "Idempotency-Key", required: true })
+  @ApiOkResponse({ schema: apiSuccessSchema(TransactionResponseDto) })
+  @ApiBadRequestResponse({ type: ApiFailureDto })
+  @ApiNotFoundResponse({ type: ApiFailureDto })
+  @ApiConflictResponse({ type: ApiFailureDto })
+  @ApiUnprocessableEntityResponse({ type: ApiFailureDto })
+  async sync(
+    @Param() params: TransactionParamsDto,
+    @Headers("idempotency-key") idempotencyKey: string | undefined,
+    @Body() body: SyncProviderPaymentDto,
+  ) {
+    const key = requireIdempotencyKey(idempotencyKey);
+    const result = await this.syncProviderPayment.execute(params.id, key, body);
+    if (!result.ok) {
+      throwTransactionError(result.error.code);
+    }
+    return result.value;
+  }
 }
 
 function throwTransactionError(code: string): never {
@@ -88,6 +162,11 @@ function throwTransactionError(code: string): never {
         message: "Product is out of stock",
         status: HttpStatus.CONFLICT,
       },
+      TRANSACTION_NOT_FOUND: {
+        code: ApiErrorCode.TransactionNotFound,
+        message: "Transaction not found",
+        status: HttpStatus.NOT_FOUND,
+      },
       SHIPPING_METHOD_NOT_FOUND: {
         code: ApiErrorCode.ShippingMethodNotFound,
         message: "Shipping method not found or inactive",
@@ -102,6 +181,21 @@ function throwTransactionError(code: string): never {
         code: ApiErrorCode.CheckoutSettingsNotFound,
         message: "Checkout settings are unavailable",
         status: HttpStatus.SERVICE_UNAVAILABLE,
+      },
+      PAYMENT_FAILED: {
+        code: ApiErrorCode.PaymentFailed,
+        message: "Payment provider rejected the charge",
+        status: HttpStatus.BAD_GATEWAY,
+      },
+      INVALID_TRANSACTION_STATE: {
+        code: ApiErrorCode.InvalidTransactionState,
+        message: "Transaction cannot be paid in its current state",
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+      },
+      IDEMPOTENCY_CONFLICT: {
+        code: ApiErrorCode.IdempotencyConflict,
+        message: "Idempotency key does not match this request",
+        status: HttpStatus.CONFLICT,
       },
     };
   const mapped = errors[code] ?? {

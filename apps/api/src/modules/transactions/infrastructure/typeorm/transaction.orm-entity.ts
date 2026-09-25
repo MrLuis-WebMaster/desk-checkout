@@ -27,6 +27,17 @@ export class TransactionOrmEntity {
   @Column({ name: "product_price", type: "integer" })
   productPrice!: number;
 
+  @Column({ type: "integer", default: 1 })
+  quantity!: number;
+
+  @Column({ name: "line_items", type: "jsonb" })
+  lineItems!: Array<{
+    productId: string;
+    productName: string;
+    productPrice: number;
+    quantity: number;
+  }>;
+
   @Column({ name: "base_fee", type: "integer" })
   baseFee!: number;
 

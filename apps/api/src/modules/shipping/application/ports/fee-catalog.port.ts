@@ -1,6 +1,6 @@
 import type {
+  ShippingCityCode,
   ShippingMethodQuoteDto,
-  ShippingRegionCode,
 } from "@checkout/contracts";
 
 export type ShippingRateLookup = {
@@ -12,9 +12,7 @@ export abstract class FeeCatalog {
   abstract getBaseFee(): Promise<number | null>;
   abstract getRate(
     methodId: string,
-    regionCode: ShippingRegionCode,
+    city: ShippingCityCode,
   ): Promise<ShippingRateLookup>;
-  abstract listQuotes(
-    regionCode: ShippingRegionCode,
-  ): Promise<ShippingMethodQuoteDto[]>;
+  abstract listQuotes(city: ShippingCityCode): Promise<ShippingMethodQuoteDto[]>;
 }

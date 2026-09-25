@@ -1,22 +1,56 @@
 <script setup lang="ts">
-import { CreditCard } from "@lucide/vue";
-import PaymentUnavailable from "@/modules/checkout/presentation/components/PaymentUnavailable.vue";
-import { useCheckout } from "@/modules/checkout/presentation/composables/use-checkout";
+import { routeNames } from "@/app/router";
+import CardPaymentForm from "@/modules/checkout/presentation/components/CardPaymentForm.vue";
+import WompiWidgetPay from "@/modules/checkout/presentation/components/WompiWidgetPay.vue";
+import { useCheckoutPage } from "@/modules/checkout/presentation/composables/use-checkout-page";
 import { CHECKOUT_SCREEN_STEPS } from "@/modules/checkout/presentation/stores/checkout.store";
+import { formatCop } from "@/shared/presentation/format-cop";
 import {
   UiAlert,
-  UiIcon,
+  UiButton,
+  UiField,
+  UiInput,
   UiPrice,
   UiProductImage,
+  UiSelect,
   UiSkeleton,
 } from "@/shared/ui";
 
-const { product, loading, errorMessage, step } = useCheckout();
+const {
+  SHIPPING_CITY_CODES,
+  SHIPPING_CITY_LABELS,
+  step,
+  hasCart,
+  displayLines,
+  fullName,
+  email,
+  phone,
+  addressLine,
+  city,
+  shippingMethodId,
+  errors,
+  quotes,
+  baseFee,
+  paymentConfig,
+  transaction,
+  formError,
+  quotesError,
+  creating,
+  loadingQuotes,
+  loadingExtras,
+  restoring,
+  merchandiseTotal,
+  selectedQuote,
+  orderTotal,
+  widgetRedirectUrl,
+  continueToPayment,
+  onCardPaid,
+} = useCheckoutPage();
 </script>
 
 <template>
   <main class="mx-auto w-full max-w-3xl">
-    <h1 class="text-2xl font-semibold tracking-tight">Payment</h1>
+    <h1 class="text-2xl font-semibold tracking-tight">Checkout</h1>
     <ol class="mt-3 flex gap-4 text-sm" aria-label="Checkout steps">
       <li
         v-for="(item, index) in CHECKOUT_SCREEN_STEPS"
@@ -28,41 +62,224 @@ const { product, loading, errorMessage, step } = useCheckout();
       </li>
     </ol>
 
-    <div v-if="loading" class="mt-6 grid gap-3" aria-busy="true">
+    <div
+      v-if="loadingExtras || restoring"
+      class="mt-6 grid gap-3"
+      aria-busy="true"
+    >
       <span class="sr-only">Loading checkout</span>
       <UiSkeleton class="h-16 w-full" />
       <UiSkeleton class="h-11 w-full" />
     </div>
 
-    <UiAlert v-else-if="errorMessage" class="mt-6">{{ errorMessage }}</UiAlert>
+    <UiAlert v-else-if="!hasCart && !transaction" class="mt-6">
+      Your cart is empty.
+      <RouterLink
+        :to="{ name: routeNames.productList }"
+        class="mt-2 block font-medium text-ink underline"
+      >
+        Browse products
+      </RouterLink>
+    </UiAlert>
 
-    <div v-else-if="product" class="lg:grid lg:grid-cols-2 lg:items-start lg:gap-12">
-      <section class="mt-6 flex gap-3 border-y border-line py-3 lg:mt-8">
-        <UiProductImage
-          :src="product.imageUrl"
-          :alt="product.name"
-          width="64"
-          height="64"
-          class="size-16 rounded-control bg-sunken object-cover"
-        />
-        <div>
-          <p class="font-medium">{{ product.name }}</p>
-          <UiPrice :amount="product.price" size="md" class="mt-1" />
-        </div>
+    <div
+      v-else-if="hasCart || transaction"
+      class="lg:grid lg:grid-cols-2 lg:items-start lg:gap-12"
+    >
+      <section class="mt-6 border-y border-line py-3 lg:mt-8">
+        <ul class="grid gap-3">
+          <li
+            v-for="line in displayLines"
+            :key="line.productId"
+            class="flex gap-3"
+          >
+            <UiProductImage
+              v-if="line.imageUrl"
+              :src="line.imageUrl"
+              :alt="line.name"
+              width="64"
+              height="64"
+              class="size-16 rounded-control bg-sunken object-cover"
+            />
+            <div
+              v-else
+              class="size-16 shrink-0 rounded-control bg-sunken"
+              aria-hidden="true"
+            />
+            <div class="min-w-0 flex-1">
+              <p class="truncate font-medium">{{ line.name }}</p>
+              <p class="mt-0.5 text-sm text-muted">Qty {{ line.quantity }}</p>
+              <UiPrice :amount="line.price" size="md" class="mt-1" />
+            </div>
+          </li>
+        </ul>
+        <dl class="mt-4 grid gap-1 text-sm text-muted">
+          <div class="flex justify-between gap-4">
+            <dt>Subtotal</dt>
+            <dd class="tabular-nums">
+              {{ formatCop(merchandiseTotal) }}
+            </dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt>Base fee</dt>
+            <dd class="tabular-nums">
+              {{ formatCop(baseFee) }}
+            </dd>
+          </div>
+          <div class="flex justify-between gap-4">
+            <dt>Shipping</dt>
+            <dd class="tabular-nums">
+              {{ formatCop(selectedQuote?.amount ?? 0) }}
+            </dd>
+          </div>
+          <div class="flex justify-between gap-4 font-medium text-ink">
+            <dt>Total</dt>
+            <dd class="tabular-nums">{{ formatCop(orderTotal) }}</dd>
+          </div>
+        </dl>
       </section>
 
       <div class="lg:mt-8">
-        <section class="mt-6 lg:mt-0">
-          <h2 class="text-sm font-medium">Method</h2>
-          <p
-            class="mt-2 flex min-h-11 items-center gap-2 rounded-control border border-ink bg-surface px-3"
-          >
-            <UiIcon :icon="CreditCard" />
-            Credit card
-          </p>
-          <PaymentUnavailable
-            message="Card payment is not available yet. You can review this order, but nothing will be charged."
-          />
+        <section v-if="!transaction" class="mt-6 lg:mt-0">
+          <form class="grid gap-4" novalidate @submit="continueToPayment">
+            <h2 class="text-sm font-medium">Customer & delivery</h2>
+
+            <UiField
+              label="Full name"
+              :error="errors.fullName"
+              v-slot="{ id, invalid }"
+            >
+              <UiInput
+                :id="id"
+                v-model="fullName"
+                name="fullName"
+                autocomplete="name"
+                :invalid="invalid"
+              />
+            </UiField>
+            <UiField
+              label="Email"
+              :error="errors.email"
+              v-slot="{ id, invalid }"
+            >
+              <UiInput
+                :id="id"
+                v-model="email"
+                type="email"
+                name="email"
+                autocomplete="email"
+                :invalid="invalid"
+              />
+            </UiField>
+            <UiField
+              label="Phone"
+              :error="errors.phone"
+              v-slot="{ id, invalid }"
+            >
+              <UiInput
+                :id="id"
+                v-model="phone"
+                name="phone"
+                autocomplete="tel"
+                inputmode="tel"
+                :invalid="invalid"
+              />
+            </UiField>
+            <UiField
+              label="Address"
+              :error="errors.addressLine"
+              v-slot="{ id, invalid }"
+            >
+              <UiInput
+                :id="id"
+                v-model="addressLine"
+                name="addressLine"
+                autocomplete="street-address"
+                :invalid="invalid"
+              />
+            </UiField>
+            <UiField
+              label="City"
+              :error="errors.city"
+              v-slot="{ id, invalid }"
+            >
+              <UiSelect
+                :id="id"
+                v-model="city"
+                name="city"
+                :invalid="invalid"
+              >
+                <option
+                  v-for="code in SHIPPING_CITY_CODES"
+                  :key="code"
+                  :value="code"
+                >
+                  {{ SHIPPING_CITY_LABELS[code] }}
+                </option>
+              </UiSelect>
+            </UiField>
+
+            <UiField
+              label="Shipping method"
+              :hint="loadingQuotes ? 'Loading options…' : undefined"
+              :error="errors.shippingMethodId || quotesError || undefined"
+              v-slot="{ id, invalid }"
+            >
+              <UiSelect
+                :id="id"
+                v-model="shippingMethodId"
+                name="shippingMethodId"
+                :invalid="invalid || Boolean(quotesError)"
+                :disabled="loadingQuotes || quotes.length === 0"
+              >
+                <option
+                  v-for="quote in quotes"
+                  :key="quote.id"
+                  :value="quote.id"
+                >
+                  {{ quote.name }} — {{ formatCop(quote.amount) }}
+                </option>
+              </UiSelect>
+            </UiField>
+
+            <UiAlert v-if="formError">{{ formError }}</UiAlert>
+
+            <UiButton
+              type="submit"
+              class="w-full"
+              :loading="creating"
+              :disabled="!paymentConfig"
+            >
+              Continue to payment
+            </UiButton>
+          </form>
+        </section>
+
+        <section v-else class="mt-6 grid gap-8 lg:mt-0">
+          <div>
+            <h2 class="text-sm font-medium">Pay with card</h2>
+            <div class="mt-3">
+              <CardPaymentForm
+                v-if="paymentConfig"
+                :transaction-id="transaction.id"
+                :payment-config="paymentConfig"
+                @paid="onCardPaid"
+              />
+            </div>
+          </div>
+
+          <div class="border-t border-line pt-6">
+            <h2 class="text-sm font-medium">Other methods</h2>
+            <div class="mt-3">
+              <WompiWidgetPay
+                :transaction-id="transaction.id"
+                :redirect-url="widgetRedirectUrl"
+                :customer-email="transaction.customer.email"
+                :customer-full-name="transaction.customer.fullName"
+                :customer-phone="transaction.customer.phone"
+              />
+            </div>
+          </div>
         </section>
       </div>
     </div>

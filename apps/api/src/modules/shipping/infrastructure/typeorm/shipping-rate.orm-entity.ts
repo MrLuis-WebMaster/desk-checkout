@@ -6,7 +6,7 @@ import {
   Unique,
   UpdateDateColumn,
 } from "typeorm";
-import type { ShippingRegionCode } from "@checkout/contracts";
+import type { ShippingCityCode } from "@checkout/contracts";
 
 @Entity({ name: "shipping_rates" })
 @Unique("UQ_shipping_rates_method_region", [
@@ -21,7 +21,7 @@ export class ShippingRateOrmEntity {
   shippingMethodId!: string;
 
   @Column({ name: "region_code", type: "varchar", length: 20 })
-  regionCode!: ShippingRegionCode;
+  regionCode!: ShippingCityCode;
 
   @Column({ name: "amount_cents", type: "integer" })
   amountCents!: number;

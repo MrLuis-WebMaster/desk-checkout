@@ -25,5 +25,6 @@ module.exports = {
     "^(\\.{1,2}/.*)\\.js$": "$1",
     "^#shared/(.*)\\.js$": "<rootDir>/src/shared/$1",
     "^#modules/(.*)\\.js$": "<rootDir>/src/modules/$1",
+    "^#config/(.*)\\.js$": "<rootDir>/src/config/$1",
   },
 };

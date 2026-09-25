@@ -4,6 +4,7 @@ import { HealthModule } from "#modules/health/presentation/health.module.js";
 import { buildDataSourceOptions } from "#shared/infrastructure/persistence/typeorm.data-source.js";
 import { CatalogModule } from "#modules/catalog/presentation/catalog.module.js";
 import { ShippingModule } from "#modules/shipping/presentation/shipping.module.js";
+import { PaymentsModule } from "#modules/payments/presentation/payments.module.js";
 import { TransactionsModule } from "#modules/transactions/presentation/transactions.module.js";
 
 @Module({
@@ -15,6 +16,7 @@ import { TransactionsModule } from "#modules/transactions/presentation/transacti
     HealthModule,
     CatalogModule,
     ShippingModule,
+    PaymentsModule,
     TransactionsModule,
   ],
 })

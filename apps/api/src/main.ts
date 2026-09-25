@@ -2,7 +2,7 @@ import { ValidationPipe } from "@nestjs/common";
 import { HttpAdapterHost, NestFactory } from "@nestjs/core";
 import helmet from "helmet";
 import { AppModule } from "./app.module.js";
-import { env } from "./config/env.js";
+import { env } from "#config/env.js";
 import { ApiExceptionFilter } from "#shared/presentation/filters/api-exception.filter.js";
 import { ApiSuccessInterceptor } from "#shared/presentation/interceptors/api-success.interceptor.js";
 import { setupSwagger } from "#shared/presentation/swagger/setup-swagger.js";

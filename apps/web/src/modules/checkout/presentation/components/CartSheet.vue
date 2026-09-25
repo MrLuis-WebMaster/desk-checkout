@@ -4,7 +4,6 @@ import { useRouter } from "vue-router";
 import { Minus, Plus, Trash2, X } from "@lucide/vue";
 import { routeNames } from "@/app/router";
 import { useCartStore } from "@/modules/checkout/presentation/stores/cart.store";
-import PaymentUnavailable from "@/modules/checkout/presentation/components/PaymentUnavailable.vue";
 import { UiButton, UiIconButton, UiPrice, UiProductImage } from "@/shared/ui";
 
 const cart = useCartStore();
@@ -12,15 +11,11 @@ const router = useRouter();
 const closeButton = useTemplateRef<{ focus: () => void }>("closeButton");
 
 function continueToCheckout() {
-  const first = cart.lines[0];
-  if (!first) {
+  if (cart.lines.length === 0) {
     return;
   }
   cart.close();
-  void router.push({
-    name: routeNames.checkout,
-    params: { id: first.productId },
-  });
+  void router.push({ name: routeNames.checkout });
 }
 
 function onKeydown(event: KeyboardEvent) {
@@ -142,9 +137,6 @@ onScopeDispose(() => {
           <UiButton class="mt-4 w-full" @click="continueToCheckout">
             Continue to checkout
           </UiButton>
-          <PaymentUnavailable
-            message="Card payment is not available yet. Nothing in this cart will be charged."
-          />
         </footer>
       </aside>
     </div>

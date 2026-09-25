@@ -4,11 +4,13 @@ import NotFoundPage from "@/app/pages/NotFoundPage.vue";
 import ProductListPage from "@/modules/catalog/presentation/pages/ProductListPage.vue";
 import ProductPage from "@/modules/catalog/presentation/pages/ProductPage.vue";
 import CheckoutPage from "@/modules/checkout/presentation/pages/CheckoutPage.vue";
+import CheckoutResultPage from "@/modules/checkout/presentation/pages/CheckoutResultPage.vue";
 
 export const routeNames = {
   productList: "productList",
   product: "product",
   checkout: "checkout",
+  checkoutResult: "checkoutResult",
   notFound: "notFound",
 } as const;
 
@@ -29,9 +31,16 @@ export interface RouteNamedMap {
   >;
   [routeNames.checkout]: RouteRecordInfo<
     typeof routeNames.checkout,
-    "/checkout/:id",
-    { id: string | number },
-    { id: string },
+    "/checkout",
+    Record<never, never>,
+    Record<never, never>,
+    never
+  >;
+  [routeNames.checkoutResult]: RouteRecordInfo<
+    typeof routeNames.checkoutResult,
+    "/checkout/result/:transactionId",
+    { transactionId: string | number },
+    { transactionId: string },
     never
   >;
   [routeNames.notFound]: RouteRecordInfo<
@@ -63,9 +72,18 @@ export const router = createRouter({
       component: ProductPage,
     },
     {
-      path: "/checkout/:id",
+      path: "/checkout/result/:transactionId",
+      name: routeNames.checkoutResult,
+      component: CheckoutResultPage,
+    },
+    {
+      path: "/checkout",
       name: routeNames.checkout,
       component: CheckoutPage,
+    },
+    {
+      path: "/checkout/:id",
+      redirect: { name: routeNames.checkout },
     },
     {
       path: "/:pathMatch(.*)*",

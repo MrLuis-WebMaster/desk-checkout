@@ -81,7 +81,7 @@ Primitives: `AppShell`, `UiButton`, `UiIconButton`, `UiIcon`, `UiField`, `UiInpu
 
 Buttons are 44px tall, radius `control`, 200ms color transitions on an exponential ease. Primary, secondary, and ghost share that shape. Disabled drops to 50% opacity. Loading sets `aria-busy`.
 
-Inputs and selects are native controls with the same height, radius, and border. `UiField` supplies the label and optional hint or error.
+Inputs and selects are native controls with the same height, radius, and border. `UiField` supplies the label and optional hint or error. `UiInput` accepts optional `inputmode` for numeric and phone fields. `UiSelect` supports `disabled`.
 
 Lists are rows with hairline dividers, not cards. Loading uses skeletons. Empty states name the situation and the next move.
 
@@ -89,4 +89,4 @@ Lists are rows with hairline dividers, not cards. Loading uses skeletons. Empty 
 
 Do keep one next step per screen, sized for a thumb. Do say the price, the stock, and whether payment can actually run.
 
-Don't add marketplace badges, sale stickers, or urgency. Don't use a second typeface, gradient text, or identical icon cards. Don't enable pay until a real charge exists.
+Don't add marketplace badges, sale stickers, or urgency. Don't use a second typeface, gradient text, or identical icon cards. Don't enable pay until the shopper has a pending order and a real charge path (card token or Wompi widget).
