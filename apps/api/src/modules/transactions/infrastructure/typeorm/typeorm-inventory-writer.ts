@@ -47,14 +47,17 @@ export class TypeOrmInventoryWriter extends InventoryWriter {
     return true;
   }
 
-  /** Locks every line first; decrements only when all lines have stock. */
+  /** Locks every line first (stable productId order); decrements only when all have stock. */
   async decrementManyLocked(
     manager: EntityManager,
     lines: Array<{ productId: string; quantity: number }>,
   ): Promise<boolean> {
+    const ordered = [...lines].sort((a, b) =>
+      a.productId.localeCompare(b.productId),
+    );
     const locked: Array<{ inventory: InventoryOrmEntity; quantity: number }> =
       [];
-    for (const line of lines) {
+    for (const line of ordered) {
       const inventory = await manager
         .createQueryBuilder(InventoryOrmEntity, "inventory")
         .setLock("pessimistic_write")

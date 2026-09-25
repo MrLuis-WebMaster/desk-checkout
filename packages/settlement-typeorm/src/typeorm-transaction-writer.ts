@@ -1,27 +1,26 @@
-import { Injectable } from "@nestjs/common";
-import { InjectDataSource } from "@nestjs/typeorm";
 import { TransactionStatus, type TransactionDto } from "@checkout/contracts";
-import { DataSource, IsNull } from "typeorm";
-import { toTransactionDto } from "../../application/mappers/transaction-dto.mapper.js";
-import { InventoryWriter } from "../../application/ports/inventory-writer.port.js";
-import {
-  TransactionWriter,
-  type PaymentSettlement,
-} from "../../application/ports/transaction-writer.port.js";
 import {
   Transaction as TransactionAggregate,
+  TransactionWriter,
+  type PaymentSettlement,
   type Transaction,
-} from "../../domain/transaction/transaction.js";
+} from "@checkout/settlement";
+import { DataSource, EntityManager, IsNull } from "typeorm";
+import { toTransactionDto } from "./transaction-dto.mapper.js";
 import { CustomerOrmEntity } from "./customer.orm-entity.js";
 import { DeliveryOrmEntity } from "./delivery.orm-entity.js";
 import { TransactionOrmEntity } from "./transaction.orm-entity.js";
 
-@Injectable()
+export type StockDecrementer = (
+  manager: EntityManager,
+  lines: Array<{ productId: string; quantity: number }>,
+) => Promise<boolean>;
+
+/** Nest-free TypeORM transaction writer. Wire via Nest factory in apps. */
 export class TypeOrmTransactionWriter extends TransactionWriter {
   constructor(
-    @InjectDataSource()
     private readonly dataSource: DataSource,
-    private readonly inventory: InventoryWriter,
+    private readonly stockDecrementer: StockDecrementer,
   ) {
     super();
   }
@@ -63,6 +62,24 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
       },
       { providerTransactionId },
     );
+  }
+
+  async expireUncharged(transaction: Transaction): Promise<boolean> {
+    const result = await this.dataSource
+      .createQueryBuilder()
+      .update(TransactionOrmEntity)
+      .set({
+        status: transaction.status,
+        providerTransactionId: transaction.providerTransactionId,
+      })
+      .where("id = :id", { id: transaction.id })
+      .andWhere("status = :status", { status: TransactionStatus.Pending })
+      .andWhere(
+        "(provider_transaction_id IS NULL OR provider_transaction_id LIKE :claimPrefix)",
+        { claimPrefix: "claim:%" },
+      )
+      .execute();
+    return (result.affected ?? 0) === 1;
   }
 
   async save(transaction: Transaction): Promise<TransactionDto> {
@@ -128,7 +145,6 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
         throw new Error(`Transaction ${transaction.id} not found`);
       }
 
-      // Another writer already settled this pending charge — do not decrement again.
       if (row.status !== TransactionStatus.Pending) {
         if (row.providerTransactionId !== transaction.providerTransactionId) {
           throw new Error("Transaction provider id mismatch on settlement");
@@ -136,20 +152,24 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
         await queryRunner.commitTransaction();
         return {
           dto: toTransactionDto(
-            withPersistedSettlement(transaction, row.status, row.providerTransactionId),
+            withPersistedSettlement(
+              transaction,
+              row.status,
+              row.providerTransactionId,
+            ),
           ),
           stockDecremented: row.status === TransactionStatus.Approved,
         };
       }
 
-      let finalStatus = transaction.status;
+      let toPersist = transaction;
       let stockDecremented = false;
 
       if (
         options.decrementStock &&
         transaction.status === TransactionStatus.Approved
       ) {
-        stockDecremented = await this.inventory.decrementManyLocked(
+        stockDecremented = await this.stockDecrementer(
           queryRunner.manager,
           transaction.lines.map((line) => ({
             productId: line.productId,
@@ -157,8 +177,7 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
           })),
         );
         if (!stockDecremented) {
-          // Customer may be charged; persist recoverable Error, never Approved without stock.
-          finalStatus = TransactionStatus.Error;
+          toPersist = transaction.markSettlementError();
         }
       }
 
@@ -169,19 +188,21 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
           status: TransactionStatus.Pending,
         },
         {
-          status: finalStatus,
-          providerTransactionId: transaction.providerTransactionId,
+          status: toPersist.status,
+          providerTransactionId: toPersist.providerTransactionId,
         },
       );
 
       if ((cas.affected ?? 0) !== 1) {
-        const winner = await queryRunner.manager.findOne(TransactionOrmEntity, {
-          where: { id: transaction.id },
-        });
+        // Another writer won. Roll back any stock decrements from this attempt
+        // so we never double-decrement or leave orphan stock moves.
+        await queryRunner.rollbackTransaction();
+        const winner = await this.dataSource
+          .getRepository(TransactionOrmEntity)
+          .findOne({ where: { id: transaction.id } });
         if (!winner) {
           throw new Error(`Transaction ${transaction.id} not found`);
         }
-        await queryRunner.commitTransaction();
         return {
           dto: toTransactionDto(
             withPersistedSettlement(
@@ -194,19 +215,15 @@ export class TypeOrmTransactionWriter extends TransactionWriter {
         };
       }
 
-      const persisted = withPersistedSettlement(
-        transaction,
-        finalStatus,
-        transaction.providerTransactionId,
-      );
-
       await queryRunner.commitTransaction();
       return {
-        dto: toTransactionDto(persisted),
+        dto: toTransactionDto(toPersist),
         stockDecremented,
       };
     } catch (error) {
-      await queryRunner.rollbackTransaction();
+      if (queryRunner.isTransactionActive) {
+        await queryRunner.rollbackTransaction();
+      }
       throw error;
     } finally {
       await queryRunner.release();

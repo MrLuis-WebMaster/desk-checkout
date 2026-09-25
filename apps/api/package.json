@@ -27,6 +27,8 @@
   },
   "dependencies": {
     "@checkout/contracts": "workspace:*",
+    "@checkout/settlement": "workspace:*",
+    "@checkout/settlement-typeorm": "workspace:*",
     "@nestjs/common": "12.1.0",
     "@nestjs/core": "12.1.0",
     "@nestjs/platform-express": "12.1.0",

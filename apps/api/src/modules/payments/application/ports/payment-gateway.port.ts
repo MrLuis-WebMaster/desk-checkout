@@ -1,4 +1,10 @@
 import type { TransactionStatus } from "@checkout/contracts";
+import {
+  SettlementPaymentGateway,
+  type ProviderPayment,
+} from "@checkout/settlement";
+
+export type { ProviderPayment };
 
 export type AcceptanceTokens = {
   publicKey: string;
@@ -19,11 +25,6 @@ export type CardPaymentInput = {
   customerEmail: string;
 };
 
-export type ProviderPayment = {
-  providerTransactionId: string;
-  status: TransactionStatus;
-};
-
 export type WidgetCheckoutSession = {
   publicKey: string;
   amountInCents: number;
@@ -32,7 +33,8 @@ export type WidgetCheckoutSession = {
   signature: string;
 };
 
-export abstract class PaymentGateway {
+/** Fat API payment gateway (tokens/card/widget + settle methods). */
+export abstract class PaymentGateway extends SettlementPaymentGateway {
   abstract getAcceptanceTokens(): Promise<AcceptanceTokens>;
   abstract createCardPayment(input: CardPaymentInput): Promise<ProviderPayment>;
   abstract createWidgetSession(input: {
@@ -43,4 +45,7 @@ export abstract class PaymentGateway {
   abstract getPaymentStatus(
     providerTransactionId: string,
   ): Promise<ProviderPayment>;
+  abstract voidPayment(providerTransactionId: string): Promise<void>;
 }
+
+export type { TransactionStatus };

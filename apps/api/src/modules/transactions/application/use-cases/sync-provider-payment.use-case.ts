@@ -5,6 +5,7 @@ import {
   type SyncProviderPaymentRequest,
   type TransactionDto,
 } from "@checkout/contracts";
+import { providerPaymentMatchesTransaction } from "@checkout/settlement";
 import { err, ok, type Result } from "#shared/result/result.js";
 import {
   IdempotencyConflictError,
@@ -15,10 +16,7 @@ import {
 } from "../../domain/transaction/errors.js";
 import { IdempotencyStore } from "../ports/idempotency-store.port.js";
 import { TransactionReader } from "../ports/transaction-reader.port.js";
-import {
-  isUniqueViolation,
-  SettleProviderPaymentService,
-} from "../services/settle-provider-payment.js";
+import { SettleProviderPaymentService } from "../services/settle-provider-payment.js";
 
 type SyncError =
   | TransactionNotFoundError
@@ -61,8 +59,8 @@ export class SyncProviderPaymentUseCase {
     try {
       await this.idempotency.begin(idempotencyKey, transactionId, requestHash);
     } catch (error) {
-      if (isUniqueViolation(error)) {
-        return err(new IdempotencyConflictError());
+      if (error instanceof IdempotencyConflictError) {
+        return err(error);
       }
       throw error;
     }
@@ -88,6 +86,14 @@ export class SyncProviderPaymentUseCase {
       return ok(current);
     }
 
+    if (
+      transaction.hasProviderCharge() &&
+      transaction.providerTransactionId !== request.providerTransactionId
+    ) {
+      await this.idempotency.abort(idempotencyKey);
+      return err(new InvalidTransactionStateError());
+    }
+
     let provider;
     try {
       provider = await this.settlement.pollUntilResolved(
@@ -98,7 +104,17 @@ export class SyncProviderPaymentUseCase {
       return err(new PaymentFailedError());
     }
 
-    return this.settlement.settle(transaction, provider, idempotencyKey);
+    if (!providerPaymentMatchesTransaction(provider, transaction)) {
+      await this.idempotency.abort(idempotencyKey);
+      return err(new InvalidTransactionStateError());
+    }
+
+    return this.settlement.settle(
+      transaction,
+      provider,
+      idempotencyKey,
+      "sync",
+    );
   }
 }
 

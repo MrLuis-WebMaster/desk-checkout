@@ -165,6 +165,16 @@ export function useCheckoutResult() {
           secondaryLabel: "Back to catalog",
           secondaryAction: goCatalog,
         };
+      case TransactionStatus.Expired:
+        return {
+          tone: "danger",
+          icon: CircleAlert,
+          title: "Checkout expired",
+          detail:
+            "This order sat unpaid too long and was closed. Start again from your cart if you still want these items.",
+          primaryLabel: "Back to catalog",
+          primaryAction: goCatalog,
+        };
     }
   });
 

@@ -2,12 +2,18 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
 import { TransactionStatus } from "@checkout/contracts";
 
 @Entity({ name: "transactions" })
+@Index("UQ_transactions_provider_transaction_id", ["providerTransactionId"], {
+  unique: true,
+  where:
+    "\"provider_transaction_id\" IS NOT NULL AND \"provider_transaction_id\" NOT LIKE 'claim:%'",
+})
 export class TransactionOrmEntity {
   @PrimaryGeneratedColumn("uuid")
   id!: string;

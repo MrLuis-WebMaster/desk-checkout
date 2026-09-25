@@ -1,16 +1,12 @@
-import { Injectable } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
 import type {
   ShippingCityCode,
   TransactionDto,
   TransactionLineDto,
 } from "@checkout/contracts";
 import { TransactionStatus } from "@checkout/contracts";
+import { Money, Transaction, TransactionReader } from "@checkout/settlement";
 import { Repository } from "typeorm";
-import { Money } from "#shared/domain/money.js";
-import { toTransactionDto } from "../../application/mappers/transaction-dto.mapper.js";
-import { TransactionReader } from "../../application/ports/transaction-reader.port.js";
-import { Transaction } from "../../domain/transaction/transaction.js";
+import { toTransactionDto } from "./transaction-dto.mapper.js";
 import { TransactionOrmEntity } from "./transaction.orm-entity.js";
 
 type TransactionRow = {
@@ -34,10 +30,9 @@ type TransactionRow = {
   providerTransactionId: string | null;
 };
 
-@Injectable()
+/** Nest-free TypeORM transaction reader. Wire via Nest factory in apps. */
 export class TypeOrmTransactionReader extends TransactionReader {
   constructor(
-    @InjectRepository(TransactionOrmEntity)
     private readonly transactions: Repository<TransactionOrmEntity>,
   ) {
     super();
@@ -49,39 +44,53 @@ export class TypeOrmTransactionReader extends TransactionReader {
   }
 
   async findAggregateById(id: string): Promise<Transaction | null> {
-    const row = await this.loadRow(id);
-    if (!row) {
-      return null;
-    }
-    const lines = resolveLines(row);
-    return Transaction.rehydrate({
-      id: row.id,
-      status: row.status,
-      lines: lines.map((line) => ({
-        productId: line.productId,
-        productName: line.productName,
-        productPrice: Money.create(line.productPrice),
-        quantity: line.quantity,
-      })),
-      baseFee: Money.create(Number(row.baseFee)),
-      deliveryFee: Money.create(Number(row.deliveryFee)),
-      total: Money.create(Number(row.total)),
-      customer: {
-        fullName: row.fullName,
-        email: row.email,
-        phone: row.phone,
-      },
-      delivery: {
-        shippingMethodId: row.shippingMethodId,
-        addressLine: row.addressLine,
-        city: row.city,
-      },
-      createdAt: new Date(row.createdAt),
-      providerTransactionId: row.providerTransactionId,
-    });
+    const row = await this.loadRowById(id);
+    return row ? toAggregate(row) : null;
   }
 
-  private loadRow(id: string): Promise<TransactionRow | undefined> {
+  async findAggregateByProviderId(
+    providerTransactionId: string,
+  ): Promise<Transaction | null> {
+    const row = await this.baseQuery()
+      .where("transaction.provider_transaction_id = :providerTransactionId", {
+        providerTransactionId,
+      })
+      .getRawOne<TransactionRow>();
+    return row ? toAggregate(row) : null;
+  }
+
+  async listStuckPending(olderThan: Date): Promise<Transaction[]> {
+    const rows = await this.baseQuery()
+      .where("transaction.status = :status", {
+        status: TransactionStatus.Pending,
+      })
+      .andWhere("transaction.provider_transaction_id IS NOT NULL")
+      .andWhere("transaction.provider_transaction_id NOT LIKE 'claim:%'")
+      .andWhere("transaction.created_at < :olderThan", { olderThan })
+      .getRawMany<TransactionRow>();
+    return rows.map(toAggregate);
+  }
+
+  async listOrphanPending(olderThan: Date): Promise<Transaction[]> {
+    const rows = await this.baseQuery()
+      .where("transaction.status = :status", {
+        status: TransactionStatus.Pending,
+      })
+      .andWhere(
+        "(transaction.provider_transaction_id IS NULL OR transaction.provider_transaction_id LIKE 'claim:%')",
+      )
+      .andWhere("transaction.created_at < :olderThan", { olderThan })
+      .getRawMany<TransactionRow>();
+    return rows.map(toAggregate);
+  }
+
+  private loadRowById(id: string): Promise<TransactionRow | undefined> {
+    return this.baseQuery()
+      .where("transaction.id = :id", { id })
+      .getRawOne<TransactionRow>();
+  }
+
+  private baseQuery() {
     return this.transactions
       .createQueryBuilder("transaction")
       .innerJoin(
@@ -113,10 +122,37 @@ export class TypeOrmTransactionReader extends TransactionReader {
         "delivery.city AS city",
         'transaction.created_at AS "createdAt"',
         'transaction.provider_transaction_id AS "providerTransactionId"',
-      ])
-      .where("transaction.id = :id", { id })
-      .getRawOne<TransactionRow>();
+      ]);
   }
+}
+
+function toAggregate(row: TransactionRow): Transaction {
+  const lines = resolveLines(row);
+  return Transaction.rehydrate({
+    id: row.id,
+    status: row.status,
+    lines: lines.map((line) => ({
+      productId: line.productId,
+      productName: line.productName,
+      productPrice: Money.create(line.productPrice),
+      quantity: line.quantity,
+    })),
+    baseFee: Money.create(Number(row.baseFee)),
+    deliveryFee: Money.create(Number(row.deliveryFee)),
+    total: Money.create(Number(row.total)),
+    customer: {
+      fullName: row.fullName,
+      email: row.email,
+      phone: row.phone,
+    },
+    delivery: {
+      shippingMethodId: row.shippingMethodId,
+      addressLine: row.addressLine,
+      city: row.city,
+    },
+    createdAt: new Date(row.createdAt),
+    providerTransactionId: row.providerTransactionId,
+  });
 }
 
 function parseLineItems(

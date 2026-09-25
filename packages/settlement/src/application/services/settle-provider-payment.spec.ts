@@ -1,8 +1,9 @@
 import { TransactionStatus } from "@checkout/contracts";
-import { Money } from "#shared/domain/money.js";
-import type { PaymentGateway } from "#modules/payments/application/ports/payment-gateway.port.js";
+import { Money } from "../../domain/money.js";
 import { Transaction } from "../../domain/transaction/transaction.js";
+import type { SettlementPaymentGateway } from "../ports/payment-gateway.port.js";
 import type { IdempotencyStore } from "../ports/idempotency-store.port.js";
+import type { SettlementLogger } from "../ports/settlement-logger.port.js";
 import type { TransactionWriter } from "../ports/transaction-writer.port.js";
 import { SettleProviderPaymentService } from "./settle-provider-payment.js";
 
@@ -43,12 +44,11 @@ describe("SettleProviderPaymentService", () => {
     releaseClaim: jest.fn(),
     attachProviderTransactionId: jest.fn(),
     updateAfterPayment: jest.fn(),
+    expireUncharged: jest.fn(),
   };
   const gateway = {
-    getAcceptanceTokens: jest.fn(),
-    createCardPayment: jest.fn(),
-    createWidgetSession: jest.fn(),
     getPaymentStatus: jest.fn(),
+    voidPayment: jest.fn(),
   };
   const idempotency = {
     find: jest.fn(),
@@ -56,16 +56,20 @@ describe("SettleProviderPaymentService", () => {
     complete: jest.fn(),
     abort: jest.fn(),
   };
+  const logger: SettlementLogger = { log: jest.fn() };
   const service = new SettleProviderPaymentService(
     writer as TransactionWriter,
-    gateway as PaymentGateway,
+    gateway as SettlementPaymentGateway,
     idempotency as IdempotencyStore,
+    logger,
+    { pollAttempts: 5, pollDelayMs: 0 },
   );
 
   beforeEach(() => {
     jest.resetAllMocks();
     idempotency.complete.mockResolvedValue(undefined);
     idempotency.abort.mockResolvedValue(undefined);
+    gateway.voidPayment.mockResolvedValue(undefined);
   });
 
   it("polls until the provider leaves pending", async () => {
@@ -98,6 +102,7 @@ describe("SettleProviderPaymentService", () => {
         status: TransactionStatus.Approved,
       },
       "key-1",
+      "sync",
     );
 
     expect(result.ok).toBe(true);
@@ -106,9 +111,34 @@ describe("SettleProviderPaymentService", () => {
       { decrementStock: true },
     );
     expect(idempotency.complete).toHaveBeenCalled();
+    expect(logger.log).toHaveBeenCalledWith(
+      "settle_outcome",
+      expect.objectContaining({ source: "sync" }),
+    );
   });
 
-  it("returns out of stock when approved settlement cannot decrement", async () => {
+  it("aborts idempotency when settlement remains pending", async () => {
+    writer.updateAfterPayment.mockImplementation(async (transaction) => ({
+      dto: { id: transaction.id, status: TransactionStatus.Pending },
+      stockDecremented: false,
+    }));
+
+    const result = await service.settle(
+      pendingTransaction(),
+      {
+        providerTransactionId: "wompi_pending",
+        status: TransactionStatus.Pending,
+      },
+      "key-pending",
+      "pay",
+    );
+
+    expect(result.ok).toBe(true);
+    expect(idempotency.abort).toHaveBeenCalledWith("key-pending");
+    expect(idempotency.complete).not.toHaveBeenCalled();
+  });
+
+  it("returns out of stock and voids when approved settlement cannot decrement", async () => {
     writer.updateAfterPayment.mockResolvedValue({
       dto: {
         id: pendingTransaction().id,
@@ -124,16 +154,52 @@ describe("SettleProviderPaymentService", () => {
         status: TransactionStatus.Approved,
       },
       "key-2",
+      "webhook",
     );
 
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("OUT_OF_STOCK");
     }
+    expect(gateway.voidPayment).toHaveBeenCalledWith("wompi_1");
+    expect(logger.log).toHaveBeenCalledWith(
+      "compensation_attempted",
+      expect.objectContaining({ orderId: pendingTransaction().id }),
+    );
+    expect(logger.log).toHaveBeenCalledWith(
+      "compensation_succeeded",
+      expect.objectContaining({ orderId: pendingTransaction().id }),
+    );
     expect(idempotency.complete).toHaveBeenCalledWith(
       "key-2",
       expect.objectContaining({ status: TransactionStatus.Error }),
       "OUT_OF_STOCK",
+    );
+  });
+
+  it("logs compensation_failed when void throws", async () => {
+    writer.updateAfterPayment.mockResolvedValue({
+      dto: {
+        id: pendingTransaction().id,
+        status: TransactionStatus.Error,
+      },
+      stockDecremented: false,
+    });
+    gateway.voidPayment.mockRejectedValue(new Error("void failed"));
+
+    const result = await service.settle(
+      pendingTransaction(),
+      {
+        providerTransactionId: "wompi_1",
+        status: TransactionStatus.Approved,
+      },
+      "key-3",
+    );
+
+    expect(result.ok).toBe(false);
+    expect(logger.log).toHaveBeenCalledWith(
+      "compensation_failed",
+      expect.objectContaining({ providerId: "wompi_1" }),
     );
   });
 });

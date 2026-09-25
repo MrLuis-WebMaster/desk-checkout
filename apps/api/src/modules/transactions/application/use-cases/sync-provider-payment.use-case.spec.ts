@@ -42,19 +42,27 @@ function pendingTransaction() {
 }
 
 describe("SyncProviderPaymentUseCase", () => {
-  const transactions = { findById: jest.fn(), findAggregateById: jest.fn() };
+  const transactions = {
+    findById: jest.fn(),
+    findAggregateById: jest.fn(),
+    findAggregateByProviderId: jest.fn(),
+    listStuckPending: jest.fn(),
+    listOrphanPending: jest.fn(),
+  };
   const writer = {
     save: jest.fn(),
     claimForPayment: jest.fn(),
     releaseClaim: jest.fn(),
     attachProviderTransactionId: jest.fn(),
     updateAfterPayment: jest.fn(),
+    expireUncharged: jest.fn(),
   };
   const gateway = {
     getAcceptanceTokens: jest.fn(),
     createCardPayment: jest.fn(),
     createWidgetSession: jest.fn(),
     getPaymentStatus: jest.fn(),
+    voidPayment: jest.fn(),
   };
   const idempotency = {
     find: jest.fn(),
@@ -86,6 +94,8 @@ describe("SyncProviderPaymentUseCase", () => {
     gateway.getPaymentStatus.mockResolvedValue({
       providerTransactionId: "wompi_1",
       status: TransactionStatus.Approved,
+      reference: pendingTransaction().id,
+      amountInCents: 1_200_000,
     });
     writer.updateAfterPayment.mockImplementation(async (transaction) => ({
       dto: { id: transaction.id, status: transaction.status },
@@ -106,6 +116,49 @@ describe("SyncProviderPaymentUseCase", () => {
       }),
       { decrementStock: true },
     );
+  });
+
+  it("rejects a provider charge bound to a different order reference", async () => {
+    gateway.getPaymentStatus.mockResolvedValue({
+      providerTransactionId: "wompi_1",
+      status: TransactionStatus.Approved,
+      reference: "other-order",
+      amountInCents: 1_200_000,
+    });
+
+    const result = await useCase.execute(
+      pendingTransaction().id,
+      "key-hijack",
+      syncRequest,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("INVALID_TRANSACTION_STATE");
+    }
+    expect(writer.updateAfterPayment).not.toHaveBeenCalled();
+    expect(idempotency.abort).toHaveBeenCalledWith("key-hijack");
+  });
+
+  it("rejects a provider charge with a mismatched amount", async () => {
+    gateway.getPaymentStatus.mockResolvedValue({
+      providerTransactionId: "wompi_1",
+      status: TransactionStatus.Approved,
+      reference: pendingTransaction().id,
+      amountInCents: 999,
+    });
+
+    const result = await useCase.execute(
+      pendingTransaction().id,
+      "key-amount",
+      syncRequest,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("INVALID_TRANSACTION_STATE");
+    }
+    expect(writer.updateAfterPayment).not.toHaveBeenCalled();
   });
 
   it("returns the current dto when already terminal with the same provider id", async () => {
@@ -132,10 +185,14 @@ describe("SyncProviderPaymentUseCase", () => {
       .mockResolvedValueOnce({
         providerTransactionId: "wompi_1",
         status: TransactionStatus.Pending,
+        reference: pendingTransaction().id,
+        amountInCents: 1_200_000,
       })
       .mockResolvedValueOnce({
         providerTransactionId: "wompi_1",
         status: TransactionStatus.Approved,
+        reference: pendingTransaction().id,
+        amountInCents: 1_200_000,
       });
     writer.updateAfterPayment.mockImplementation(async (transaction) => ({
       dto: { id: transaction.id, status: transaction.status },
@@ -155,6 +212,8 @@ describe("SyncProviderPaymentUseCase", () => {
     gateway.getPaymentStatus.mockResolvedValue({
       providerTransactionId: "wompi_1",
       status: TransactionStatus.Approved,
+      reference: pendingTransaction().id,
+      amountInCents: 1_200_000,
     });
     writer.updateAfterPayment.mockResolvedValue({
       dto: {
