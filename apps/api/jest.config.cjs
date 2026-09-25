@@ -38,6 +38,12 @@ module.exports = {
     "index\\.ts$",
   ],
   coverageReporters: ["text", "text-summary"],
+  coverageThreshold: {
+    global: {
+      lines: 80,
+      statements: 80,
+    },
+  },
   transform: {
     "^.+\\.(t|j)sx?$": [
       "@swc/jest",

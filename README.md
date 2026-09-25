@@ -10,8 +10,26 @@ TypeScript monorepo for a product checkout: Vue 3 + Pinia on the frontend, NestJ
 4. ~~Checkout orchestration and payment provider.~~ **Done**
 5. ~~Frontend checkout flow.~~ **Done**
 6. ~~Async worker + Wompi webhooks.~~ **Done**
-7. Tests above 80% coverage.
+7. ~~Tests above 80% coverage.~~ **Done**
 8. Security, CI, and deployment.
+
+### Coverage
+
+Per-package line/statement gate at **80%** (`pnpm test:cov`). Branches are reported only (soft).
+
+| Package | Tool | In scope (high level) |
+| --- | --- | --- |
+| `@checkout/contracts` | Jest | `src/**` except barrel `index.ts` |
+| `@checkout/settlement` | Jest | `domain` + `application` |
+| `@checkout/settlement-typeorm` | Jest | `src/**` except orm entities / barrel |
+| `@checkout/api` | Jest | application/domain/controllers/mappers/shared/config; excludes modules, DTOs, orm entities, migrations, data-source, seed, swagger setup, Nest settlement logger, Wompi HTTP gateway, large product-list TypeORM reader |
+| `@checkout/worker` | Jest | application + presentation + settlement infra + config; excludes modules, main, Wompi HTTP gateway, reconciliation scheduler |
+| `@checkout/web` | Vitest | `src/**/*.{ts,tsx}` excluding Vue SFCs, HTTP adapters, composition barrels, page orchestrators, and port type files |
+
+```bash
+pnpm test
+pnpm test:cov
+```
 
 ## Local setup
 

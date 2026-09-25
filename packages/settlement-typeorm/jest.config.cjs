@@ -5,7 +5,6 @@ module.exports = {
   testMatch: ["**/*.spec.ts"],
   moduleFileExtensions: ["ts", "js", "json"],
   clearMocks: true,
-  passWithNoTests: true,
   collectCoverageFrom: [
     "src/**/*.ts",
     "!src/**/*.orm-entity.ts",
@@ -24,6 +23,12 @@ module.exports = {
     "index\\.ts$",
   ],
   coverageReporters: ["text", "text-summary"],
+  coverageThreshold: {
+    global: {
+      lines: 80,
+      statements: 80,
+    },
+  },
   transform: {
     "^.+\\.(t|j)sx?$": [
       "@swc/jest",
