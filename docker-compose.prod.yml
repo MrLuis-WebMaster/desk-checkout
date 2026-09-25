@@ -80,9 +80,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
       # Wait until API finished dist-only migrate and /health responds.
+      # Rabbit is optional at boot: reconciliation/expiry still run; messaging
+      # reconnects via RabbitConnectionManager when the broker returns.
       api:
         condition: service_healthy
 

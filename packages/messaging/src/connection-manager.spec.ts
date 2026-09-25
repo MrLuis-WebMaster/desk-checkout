@@ -174,4 +174,27 @@ describe("RabbitConnectionManager", () => {
 
     await manager.stop();
   });
+
+  it("closes connection and channel when topology assertion fails", async () => {
+    const socket = createFakeSocket();
+    socket.channel.assertQueue.mockRejectedValue(
+      new Error("PRECONDITION_FAILED - inequivalent arg 'x-message-ttl'"),
+    );
+    connectMock.mockResolvedValue(socket.connection as never);
+
+    const manager = new RabbitConnectionManager({
+      url: "amqp://localhost:5672",
+      reconnectDelayMs: 60_000,
+      queues: [PAYMENT_EVENTS_QUEUES],
+      logger: { info: jest.fn(), error: jest.fn() },
+    });
+    manager.start();
+
+    await waitFor(() => socket.connection.close.mock.calls.length > 0);
+    expect(manager.isConnected()).toBe(false);
+    expect(socket.channel.close).toHaveBeenCalled();
+    expect(socket.connection.close).toHaveBeenCalled();
+
+    await manager.stop();
+  });
 });

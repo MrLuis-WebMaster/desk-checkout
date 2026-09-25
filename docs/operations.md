@@ -46,7 +46,7 @@ Key variables (full template in `deploy/env.production.example`):
 
 ## Local prod-like smoke
 
-[`docker-compose.prod.yml`](../docker-compose.prod.yml) pins ports: Postgres **5434**, API **3000**, worker **3001**, web **8080**. RabbitMQ stays internal. `TRUST_PROXY` is forced off because the API port is published directly. The worker `depends_on` the API with `condition: service_healthy`.
+[`docker-compose.prod.yml`](../docker-compose.prod.yml) pins ports: Postgres **5434**, API **3000**, worker **3001**, web **8080**. RabbitMQ stays internal. `TRUST_PROXY` is forced off because the API port is published directly. Neither API nor worker blocks boot on Rabbit health — they reconnect via `RabbitConnectionManager`. The worker still `depends_on` the API with `condition: service_healthy` so migrations finish first.
 
 ```bash
 docker compose -f docker-compose.prod.yml up --build -d

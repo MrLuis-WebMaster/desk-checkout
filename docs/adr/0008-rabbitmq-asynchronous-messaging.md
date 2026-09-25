@@ -12,7 +12,7 @@ Wompi webhooks previously hit the worker and ran settlement inside the HTTP requ
 
 - Move the public Events URL to the API (`POST /webhooks/wompi`). The API validates checksum and publishes a versioned `payment.status.changed` message to RabbitMQ with publisher confirms, then returns 200. Publish failures return 503 so Wompi retries.
 - The existing Nest worker consumes `payment.events`, ACKs on success, and reuses `HandleWompiEventUseCase` → `SettleProviderPaymentService`.
-- Use `amqplib` in Nest-free `@checkout/messaging`. Queues: `payment.events`, `payment.events.retry` (TTL 5s + DLX back to main), `payment.events.dlq`. Bounded retries via `x-retry-count`; never `requeue=true`.
+- Use `amqplib` in Nest-free `@checkout/messaging`. Queues: `payment.events`, `payment.events.retry` (TTL 5s + DLX back to main), `payment.events.dlq`. Normal handler failures move to bounded retry/DLQ via `x-retry-count` and are ACK'd only after that durable copy is confirmed — they are never blindly requeued. If publishing the only durable copy to retry/DLQ itself fails, the original message is requeued (`nack(..., requeue=true)`) and the channel is recovered so RabbitMQ can redeliver; settlement handlers stay idempotent.
 - RabbitMQ is **not** on the critical checkout path. API bootstrap must not block on the broker; catalog/create/pay/sync keep working when Rabbit is down. `/health` does not probe Rabbit.
 - Do **not** move inventory updates onto RabbitMQ. Stock stays inside the Postgres settlement transaction.
 

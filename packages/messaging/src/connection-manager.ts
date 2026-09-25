@@ -264,16 +264,18 @@ export class RabbitConnectionManager {
   }
 
   private async connectOnce(): Promise<void> {
+    let connection: ChannelModel | null = null;
+    let channel: ConfirmChannel | null = null;
     try {
-      const connection = await amqp.connect(this.url);
+      connection = await amqp.connect(this.url);
       if (this.stopped) {
         await connection.close();
         return;
       }
-      const channel = await connection.createConfirmChannel();
+      channel = await connection.createConfirmChannel();
       for (const triplet of this.queues) {
         await assertQueueTriplet(
-          (queue, options) => channel.assertQueue(queue, options),
+          (queue, options) => channel!.assertQueue(queue, options),
           triplet,
         );
       }
@@ -297,6 +299,16 @@ export class RabbitConnectionManager {
         error: error instanceof Error ? error.message : String(error),
       });
       this.clearSocket();
+      try {
+        await channel?.close();
+      } catch {
+        // ignore
+      }
+      try {
+        await connection?.close();
+      } catch {
+        // ignore
+      }
       this.scheduleReconnect();
     }
   }
