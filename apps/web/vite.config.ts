@@ -33,6 +33,7 @@ export default defineConfig({
       reporter: ["text", "text-summary"],
       include: ["src/**/*.{ts,tsx}"],
       exclude: [
+        // Plan-locked
         "src/**/*.vue",
         "src/main.ts",
         "src/vite-env.d.ts",
@@ -41,6 +42,9 @@ export default defineConfig({
         "src/**/composition/index.ts",
         "src/**/infrastructure/http-*.ts",
         "src/**/infrastructure/wompi-browser.ts",
+        // Documented extras (see README Coverage): HTTP client, route table,
+        // UI barrel, type-only ports, 1-line re-exports, page orchestrators,
+        // and Vue-router–bound catalog list/detail composables.
         "src/shared/infrastructure/http/api-client.ts",
         "src/app/router.ts",
         "src/shared/ui/index.ts",
@@ -50,9 +54,9 @@ export default defineConfig({
         "src/modules/checkout/presentation/composables/use-checkout-page.ts",
         "src/modules/checkout/presentation/composables/use-card-payment.ts",
         "src/modules/checkout/presentation/composables/use-wompi-widget.ts",
-        "src/modules/checkout/presentation/composables/use-checkout.ts",
-        "src/modules/checkout/presentation/composables/use-add-to-cart.ts",
-        "src/modules/catalog/presentation/composables/**",
+        "src/modules/catalog/presentation/composables/use-product-list-query.ts",
+        "src/modules/catalog/presentation/composables/use-product-list.ts",
+        "src/modules/catalog/presentation/composables/use-product.ts",
       ],
       thresholds: {
         lines: 80,

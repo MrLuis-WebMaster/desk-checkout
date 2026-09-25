@@ -52,7 +52,7 @@ describe("TypeOrmInventoryWriter", () => {
     ).resolves.toBe(false);
   });
 
-  it("locks product ids in sorted order and fail-closes on short stock", async () => {
+  it("delegates multi-line CAS: sorted locks and fail-closes on short stock", async () => {
     const lockOrder: string[] = [];
     const rows: Record<string, { available: number }> = {
       "b-id": { available: 5 },

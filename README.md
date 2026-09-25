@@ -22,9 +22,9 @@ Per-package line/statement gate at **80%** (`pnpm test:cov`). Branches are repor
 | `@checkout/contracts` | Jest | `src/**` except barrel `index.ts` |
 | `@checkout/settlement` | Jest | `domain` + `application` |
 | `@checkout/settlement-typeorm` | Jest | `src/**` except orm entities / barrel |
-| `@checkout/api` | Jest | application/domain/controllers/mappers/shared/config; excludes modules, DTOs, orm entities, migrations, data-source, seed, swagger setup, Nest settlement logger, Wompi HTTP gateway, large product-list TypeORM reader |
-| `@checkout/worker` | Jest | application + presentation + settlement infra + config; excludes modules, main, Wompi HTTP gateway, reconciliation scheduler |
-| `@checkout/web` | Vitest | `src/**/*.{ts,tsx}` excluding Vue SFCs, HTTP adapters, composition barrels, page orchestrators, and port type files |
+| `@checkout/api` | Jest | Plan globs (application/domain/controllers/mappers/infra/shared/config). Extra excludes: Nest modules, DTOs, orm entities, migrations, `typeorm.data-source.ts`, `seed.ts`, `setup-swagger.ts`, Nest settlement logger, Wompi HTTP gateway, `typeorm-product-reader.ts` (large list/cursor TypeORM reader) |
+| `@checkout/worker` | Jest | Plan globs (application + presentation + settlement infra + config). Extra excludes: Nest modules, `main.ts`, Wompi HTTP gateway, `reconciliation.scheduler.ts` (timer-bound; use cases covered) |
+| `@checkout/web` | Vitest | Plan include `src/**/*.{ts,tsx}`. Plan excludes: Vue SFCs, `main.ts`, `vite-env.d.ts`, tests, composition barrels, `http-*.ts` adapters, `wompi-browser.ts`. Extra excludes: `api-client.ts`, `app/router.ts`, `shared/ui/index.ts`, application port types, catalog 1-line re-exports, checkout page orchestrators (`use-checkout-page`, `use-card-payment`, `use-wompi-widget`), catalog list/detail composables (`use-product-list-query`, `use-product-list`, `use-product`) |
 
 ```bash
 pnpm test
