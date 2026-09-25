@@ -10,8 +10,26 @@ TypeScript monorepo for a product checkout: Vue 3 + Pinia on the frontend, NestJ
 4. ~~Checkout orchestration and payment provider.~~ **Done**
 5. ~~Frontend checkout flow.~~ **Done**
 6. ~~Async worker + Wompi webhooks.~~ **Done**
-7. Tests above 80% coverage.
+7. ~~Tests above 80% coverage.~~ **Done**
 8. Security, CI, and deployment.
+
+### Coverage
+
+Per-package line/statement gate at **80%** (`pnpm test:cov`). Branches are reported only (soft).
+
+| Package | Tool | In scope (high level) |
+| --- | --- | --- |
+| `@checkout/contracts` | Jest | `src/**` except barrel `index.ts` |
+| `@checkout/settlement` | Jest | `domain` + `application` |
+| `@checkout/settlement-typeorm` | Jest | `src/**` except orm entities / barrel |
+| `@checkout/api` | Jest | Plan globs (application/domain/controllers/mappers/infra/shared/config). Extra excludes: Nest modules, DTOs, orm entities, migrations, `typeorm.data-source.ts`, `seed.ts`, `setup-swagger.ts`, Nest settlement logger, `typeorm-product-reader.ts` (large list/cursor TypeORM reader) |
+| `@checkout/worker` | Jest | Plan globs (application + presentation + settlement infra + config). Extra excludes: Nest modules, `main.ts`, `reconciliation.scheduler.ts` (timer-bound; use cases covered) |
+| `@checkout/web` | Vitest | Plan include `src/**/*.{ts,tsx}`. Plan excludes: Vue SFCs, `main.ts`, `vite-env.d.ts`, tests, composition barrels, catalog `http-*.ts` adapters, `wompi-browser.ts`. Extra excludes: `api-client.ts`, `app/router.ts`, `shared/ui/index.ts`, application port types, catalog 1-line re-exports, checkout page shell (`use-checkout-page` — form+quote+create orchestration; charge/sync covered via `http-checkout.adapter`, `use-card-payment`, `use-wompi-widget`, `use-checkout-result`), catalog list/detail composables (`use-product-list-query`, `use-product-list`, `use-product`) |
+
+```bash
+pnpm test
+pnpm test:cov
+```
 
 ## Local setup
 

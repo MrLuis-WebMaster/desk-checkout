@@ -117,6 +117,34 @@ describe("SettleProviderPaymentService", () => {
     );
   });
 
+  it("aborts idempotency on invalid state when applying provider result", async () => {
+    const approved = pendingTransaction().applyProviderResult(
+      "wompi_existing",
+      TransactionStatus.Approved,
+    );
+
+    const result = await service.settle(
+      approved,
+      {
+        providerTransactionId: "wompi_other",
+        status: TransactionStatus.Declined,
+      },
+      "key-invalid",
+      "sync",
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("INVALID_TRANSACTION_STATE");
+    }
+    expect(idempotency.abort).toHaveBeenCalledWith("key-invalid");
+    expect(writer.updateAfterPayment).not.toHaveBeenCalled();
+    expect(logger.log).toHaveBeenCalledWith(
+      "settle_outcome",
+      expect.objectContaining({ status: "invalid_state" }),
+    );
+  });
+
   it("aborts idempotency when settlement remains pending", async () => {
     writer.updateAfterPayment.mockImplementation(async (transaction) => ({
       dto: { id: transaction.id, status: TransactionStatus.Pending },

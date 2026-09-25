@@ -22,6 +22,7 @@
     "start": "node dist/main.js",
     "lint": "tsc -p tsconfig.json --noEmit",
     "test": "jest --config jest.config.cjs",
+    "test:cov": "jest --config jest.config.cjs --coverage",
     "db:migrate": "tsc -p tsconfig.json && typeorm migration:run -d dist/shared/infrastructure/persistence/typeorm.data-source.js",
     "db:seed": "tsc -p tsconfig.json && node dist/shared/infrastructure/persistence/seed.js"
   },

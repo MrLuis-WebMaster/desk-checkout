@@ -6,6 +6,34 @@ module.exports = {
   moduleFileExtensions: ["ts", "js", "json"],
   clearMocks: true,
   setupFiles: ["<rootDir>/jest.setup.cjs"],
+  collectCoverageFrom: [
+    "src/modules/**/application/**/*.ts",
+    "src/modules/**/presentation/**/*.ts",
+    "src/modules/settlement/infrastructure/**/*.ts",
+    "src/config/**/*.ts",
+    "!src/**/*.spec.ts",
+    "!src/**/*.module.ts",
+    "!src/main.ts",
+    "!src/modules/reconciliation/presentation/reconciliation.scheduler.ts",
+  ],
+  coveragePathIgnorePatterns: [
+    "/node_modules/",
+    "\\.spec\\.ts$",
+    "\\.test\\.ts$",
+    "main\\.ts$",
+    "\\.module\\.ts$",
+    "\\.orm-entity\\.ts$",
+    "/migrations/",
+    "data-source\\.ts$",
+    "index\\.ts$",
+  ],
+  coverageReporters: ["text", "text-summary"],
+  coverageThreshold: {
+    global: {
+      lines: 80,
+      statements: 80,
+    },
+  },
   transform: {
     "^.+\\.(t|j)sx?$": [
       "@swc/jest",
