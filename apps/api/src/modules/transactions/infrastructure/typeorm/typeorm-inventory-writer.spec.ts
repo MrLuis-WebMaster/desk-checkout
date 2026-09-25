@@ -1,3 +1,4 @@
+import { InventoryOrmEntity } from "#modules/inventory/infrastructure/typeorm/inventory.orm-entity.js";
 import { TypeOrmInventoryWriter } from "./typeorm-inventory-writer";
 
 describe("TypeOrmInventoryWriter", () => {
@@ -85,6 +86,9 @@ describe("TypeOrmInventoryWriter", () => {
         { productId: "a-id", quantity: 1 },
       ]),
     ).resolves.toBe(true);
+    expect(manager.createQueryBuilder.mock.calls[0]?.[0]).toBe(
+      InventoryOrmEntity,
+    );
     expect(lockOrder).toEqual(["a-id", "b-id"]);
     expect(saves).toHaveLength(2);
 

@@ -53,6 +53,7 @@ export class TypeOrmInventoryWriter extends InventoryWriter {
     manager: EntityManager,
     lines: Array<{ productId: string; quantity: number }>,
   ): Promise<boolean> {
-    return decrementManyLockedShared(manager, lines);
+    // Must pass the API-registered entity — TypeORM keys metadata by class.
+    return decrementManyLockedShared(manager, lines, InventoryOrmEntity);
   }
 }

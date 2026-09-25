@@ -70,4 +70,26 @@ describe("decrementManyLocked", () => {
     expect(ok).toBe(false);
     expect(saves).toHaveLength(0);
   });
+
+  it("uses the caller-supplied inventory entity class", async () => {
+    class ApiInventoryEntity {
+      productId!: string;
+      available!: number;
+    }
+    const { manager } = mockManager({
+      "a-product": { available: 2 },
+    });
+
+    const ok = await decrementManyLocked(
+      manager as never,
+      [{ productId: "a-product", quantity: 1 }],
+      ApiInventoryEntity,
+    );
+
+    expect(ok).toBe(true);
+    expect(manager.createQueryBuilder).toHaveBeenCalledWith(
+      ApiInventoryEntity,
+      "inventory",
+    );
+  });
 });
