@@ -2,11 +2,14 @@ import { computed, onMounted, ref, type Component } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { CircleAlert, CircleCheck, CircleX, Clock } from "@lucide/vue";
 import {
+  computeMerchandiseTotal,
   DeliveryStatus,
   TransactionStatus,
+  type ShippingCityCode,
   type TransactionDto,
   type TransactionLineDto,
 } from "@checkout/contracts";
+import { SHIPPING_CITY_LABELS } from "@/modules/checkout/presentation/shipping-cities";
 import { routeNames } from "@/app/router";
 import {
   getTransaction,
@@ -39,6 +42,9 @@ export function useCheckoutResult() {
   const status = ref<TransactionStatus | null>(null);
   const deliveryStatus = ref<DeliveryStatus | null>(null);
   const lines = ref<TransactionLineDto[]>([]);
+  const baseFee = ref(0);
+  const deliveryFee = ref(0);
+  const shippingCity = ref<ShippingCityCode | null>(null);
   const total = ref(0);
 
   function applyTransaction(value: TransactionDto) {
@@ -55,6 +61,9 @@ export function useCheckoutResult() {
               quantity: value.quantity,
             },
           ];
+    baseFee.value = value.baseFee;
+    deliveryFee.value = value.deliveryFee;
+    shippingCity.value = value.delivery.city;
     total.value = value.total;
     finalizeCheckout(value.status);
   }
@@ -211,12 +220,29 @@ export function useCheckoutResult() {
     }
   });
 
+  const merchandiseTotal = computed(() =>
+    computeMerchandiseTotal(
+      lines.value.map((line) => ({
+        unitPrice: line.productPrice,
+        quantity: line.quantity,
+      })),
+    ),
+  );
+
+  const shippingCityLabel = computed(() =>
+    shippingCity.value ? SHIPPING_CITY_LABELS[shippingCity.value] : "",
+  );
+
   const purchasedCta = computed(() => purchasedProductsCta(lines.value));
 
   return {
     loading,
     errorMessage,
     lines,
+    merchandiseTotal,
+    baseFee,
+    deliveryFee,
+    shippingCityLabel,
     total,
     deliveryStatus,
     view,

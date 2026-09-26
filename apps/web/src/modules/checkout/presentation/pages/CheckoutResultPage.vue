@@ -7,6 +7,10 @@ const {
   loading,
   errorMessage,
   lines,
+  merchandiseTotal,
+  baseFee,
+  deliveryFee,
+  shippingCityLabel,
   total,
   deliveryStatus,
   view,
@@ -69,11 +73,11 @@ const {
           >
             <p class="min-w-0">
               <span class="font-medium">{{ line.productName }}</span>
-              <span
-                v-if="line.quantity > 1"
-                class="ml-1.5 text-sm text-muted"
-              >
-                × {{ line.quantity }}
+              <span class="mt-0.5 block text-sm text-muted">
+                Qty {{ line.quantity }}
+                <template v-if="line.quantity > 1">
+                  · {{ formatCop(line.productPrice) }} each
+                </template>
               </span>
             </p>
             <p class="shrink-0 tabular-nums text-muted">
@@ -81,14 +85,33 @@ const {
             </p>
           </li>
         </ul>
-        <div
-          class="mt-4 flex items-baseline justify-between gap-4 border-t border-line pt-4"
-        >
-          <p class="text-sm text-muted">Total</p>
-          <p class="text-xl font-semibold tabular-nums">
-            {{ formatCop(total) }}
-          </p>
-        </div>
+        <dl class="mt-4 grid gap-1 border-t border-line pt-4 text-sm">
+          <div class="flex justify-between gap-4 text-muted">
+            <dt>Subtotal</dt>
+            <dd class="tabular-nums">{{ formatCop(merchandiseTotal) }}</dd>
+          </div>
+          <div class="flex justify-between gap-4 text-muted">
+            <dt>Base fee</dt>
+            <dd class="tabular-nums">{{ formatCop(baseFee) }}</dd>
+          </div>
+          <div class="flex justify-between gap-4 text-muted">
+            <dt>
+              Shipping
+              <template v-if="shippingCityLabel">
+                to {{ shippingCityLabel }}
+              </template>
+            </dt>
+            <dd class="tabular-nums">{{ formatCop(deliveryFee) }}</dd>
+          </div>
+          <div
+            class="mt-3 flex items-baseline justify-between gap-4 border-t border-line pt-4"
+          >
+            <dt class="text-muted">Total</dt>
+            <dd class="text-xl font-semibold tabular-nums text-ink">
+              {{ formatCop(total) }}
+            </dd>
+          </div>
+        </dl>
       </section>
 
       <div class="mt-8 grid gap-3">

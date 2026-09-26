@@ -87,11 +87,24 @@ describe("useCheckoutResult", () => {
     });
 
     const { useCheckoutResult } = await import("./use-checkout-result");
-    const { loading, errorMessage, total, view, purchasedCta } =
-      useCheckoutResult();
+    const {
+      loading,
+      errorMessage,
+      merchandiseTotal,
+      baseFee,
+      deliveryFee,
+      shippingCityLabel,
+      total,
+      view,
+      purchasedCta,
+    } = useCheckoutResult();
     await vi.waitFor(() => expect(loading.value).toBe(false));
 
     expect(errorMessage.value).toBe("");
+    expect(merchandiseTotal.value).toBe(10000);
+    expect(baseFee.value).toBe(500);
+    expect(deliveryFee.value).toBe(1500);
+    expect(shippingCityLabel.value).toBe("Bogotá");
     expect(total.value).toBe(12000);
     expect(finalizeCheckout).toHaveBeenCalledWith(TransactionStatus.Approved);
     expect(view.value?.title).toMatch(/approved/i);
