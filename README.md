@@ -68,7 +68,7 @@ After schema changes, run `pnpm db:migrate` and `pnpm db:seed` again.
 
 ### API docs (Swagger)
 
-OpenAPI UI is served at **`/docs`** when `ENABLE_SWAGGER` is unset/`1`/`true` (default, including production). Set `ENABLE_SWAGGER=0` to disable docs and Swagger CSP. Locally: [http://localhost:3000/docs](http://localhost:3000/docs). After deploy: `https://<api-host>/docs` (replace with the public API host). No Postman collection is maintained.
+OpenAPI UI is served at **`/docs`** when `ENABLE_SWAGGER` is unset/`1`/`true` (default, including production). Set `ENABLE_SWAGGER=0` to disable docs and Swagger CSP. Locally: [http://localhost:3000/docs](http://localhost:3000/docs). Public: [https://checkout-api.134.209.221.32.sslip.io/docs](https://checkout-api.134.209.221.32.sslip.io/docs). No Postman collection is maintained.
 
 ## Environment
 
@@ -96,7 +96,7 @@ Copy values from `.env.example` / `apps/worker/.env.example`. Sandbox keys come 
 7. Guest `GET /transactions/:id` is UUID-only (no auth). Treat UUIDs as secrets.
 8. Wompi Events hit the API → RabbitMQ → worker. Checkout/pay/sync do not require RabbitMQ to be up.
 
-Wompi **Events URL** must point at the API: `https://<public-api-host>/webhooks/wompi`.
+Wompi **Events URL** must point at the API: `https://checkout-api.134.209.221.32.sslip.io/webhooks/wompi`.
 
 Full flow and status table: [`docs/architecture.md`](docs/architecture.md).
 
@@ -159,8 +159,8 @@ Prod-like smoke (Postgres **5434**, api **3000**, worker **3001**, web **8080**)
 
 | Surface | URL |
 | --- | --- |
-| Deployed web | `https://<web-host>` (set after Coolify / public DNS) |
-| Deployed API docs | `https://<api-host>/docs` |
+| Deployed web | [https://checkout.134.209.221.32.sslip.io/](https://checkout.134.209.221.32.sslip.io/) |
+| Deployed API docs | [https://checkout-api.134.209.221.32.sslip.io/docs](https://checkout-api.134.209.221.32.sslip.io/docs) |
 
 ```bash
 docker compose -f docker-compose.prod.yml up --build -d
