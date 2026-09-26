@@ -13,8 +13,11 @@ export class ShippingCityQueryDto {
   @IsIn(SHIPPING_CITY_CODES)
   city?: ShippingCityCode;
 
-  /** @deprecated Use `city`. */
-  @ApiPropertyOptional({ enum: SHIPPING_CITY_CODES, deprecated: true })
+  @ApiPropertyOptional({
+    enum: SHIPPING_CITY_CODES,
+    deprecated: true,
+    description: "Deprecated. Use `city`.",
+  })
   @IsOptional()
   @IsIn(SHIPPING_CITY_CODES)
   region?: ShippingCityCode;

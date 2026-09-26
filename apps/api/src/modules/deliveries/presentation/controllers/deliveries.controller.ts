@@ -42,7 +42,7 @@ export class DeliveriesController {
 
   @Post()
   @Throttle(STRICT_THROTTLE)
-  @ApiOperation({ summary: "Crear una entrega" })
+  @ApiOperation({ summary: "Create a delivery" })
   @ApiCreatedResponse({ schema: apiSuccessSchema(DeliveryResponseDto) })
   @ApiUnprocessableEntityResponse({ type: ApiFailureDto })
   async create(@Body() body: CreateDeliveryDto) {
@@ -59,7 +59,7 @@ export class DeliveriesController {
 
   @Get(":id")
   @Throttle(STRICT_THROTTLE)
-  @ApiOperation({ summary: "Obtener una entrega por id" })
+  @ApiOperation({ summary: "Get a delivery by id" })
   @ApiOkResponse({ schema: apiSuccessSchema(DeliveryResponseDto) })
   @ApiNotFoundResponse({ type: ApiFailureDto })
   async show(@Param() params: DeliveryParamsDto) {

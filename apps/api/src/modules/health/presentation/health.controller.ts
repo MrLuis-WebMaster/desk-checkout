@@ -16,7 +16,7 @@ import { apiSuccessSchema } from "#shared/presentation/swagger/api-envelope.js";
 export class HealthController {
   @Get()
   @SkipThrottle({ default: true })
-  @ApiOperation({ summary: "Estado del servicio" })
+  @ApiOperation({ summary: "Service health" })
   @ApiOkResponse({ schema: apiSuccessSchema(HealthResponseDto) })
   check(): HealthDto {
     return {

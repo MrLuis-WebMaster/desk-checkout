@@ -62,7 +62,7 @@ export class TransactionsController {
 
   @Post()
   @Throttle(STRICT_THROTTLE)
-  @ApiOperation({ summary: "Crear una transacción pendiente" })
+  @ApiOperation({ summary: "Create a pending transaction" })
   @ApiCreatedResponse({ schema: apiSuccessSchema(TransactionResponseDto) })
   @ApiNotFoundResponse({ type: ApiFailureDto })
   @ApiConflictResponse({ type: ApiFailureDto })
@@ -80,7 +80,7 @@ export class TransactionsController {
 
   @Get(":id")
   @Throttle(STRICT_THROTTLE)
-  @ApiOperation({ summary: "Obtener una transacción" })
+  @ApiOperation({ summary: "Get a transaction" })
   @ApiOkResponse({ schema: apiSuccessSchema(TransactionResponseDto) })
   @ApiNotFoundResponse({ type: ApiFailureDto })
   async show(@Param() params: TransactionParamsDto) {

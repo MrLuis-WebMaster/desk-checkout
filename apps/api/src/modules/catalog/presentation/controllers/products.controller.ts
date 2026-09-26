@@ -40,7 +40,7 @@ export class ProductsController {
   ) {}
 
   @Get()
-  @ApiOperation({ summary: "Listar productos del catálogo" })
+  @ApiOperation({ summary: "List catalog products" })
   @ApiOkResponse({ schema: apiSuccessSchema(ProductPageResponseDto) })
   @ApiBadRequestResponse({ type: ApiFailureDto })
   async list(@Query() query: ListProductsQueryDto) {
@@ -56,7 +56,7 @@ export class ProductsController {
   }
 
   @Get(":id")
-  @ApiOperation({ summary: "Obtener un producto por id" })
+  @ApiOperation({ summary: "Get a product by id" })
   @ApiOkResponse({ schema: apiSuccessSchema(ProductResponseDto) })
   @ApiNotFoundResponse({ type: ApiFailureDto })
   async show(@Param() params: ProductParamsDto) {

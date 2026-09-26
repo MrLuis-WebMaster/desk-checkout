@@ -73,7 +73,7 @@ export class ListProductsQueryDto {
   @ApiPropertyOptional({
     maxLength: 2048,
     description:
-      "Cursor de la página siguiente. Mutuamente excluyente con `page`, `before` e `ids`.",
+      "Cursor for the next page. Mutually exclusive with `page`, `before`, and `ids`.",
   })
   @IsOptional()
   @IsString()
@@ -83,7 +83,7 @@ export class ListProductsQueryDto {
   @ApiPropertyOptional({
     maxLength: 2048,
     description:
-      "Cursor de la página anterior. Mutuamente excluyente con `page`, `after` e `ids`.",
+      "Cursor for the previous page. Mutually exclusive with `page`, `after`, and `ids`.",
   })
   @IsOptional()
   @IsString()
@@ -96,7 +96,7 @@ export class ListProductsQueryDto {
     default: 1,
     type: Number,
     description:
-      "Página 1-based (offset). Solo cuando no se envían `after`/`before`/`ids`. Máximo alineado con PRODUCT_LIST_OFFSET_PAGE_MAX; más allá usa cursores.",
+      "1-based offset page. Only when `after`, `before`, and `ids` are omitted. Maximum 100; beyond that, use cursors.",
   })
   @IsOptional()
   @Type(() => Number)
@@ -110,7 +110,7 @@ export class ListProductsQueryDto {
     format: "uuid",
     maxItems: PRODUCT_LIST_IDS_MAX,
     description:
-      "Ids exactos de productos (sin cursor). Mutuamente excluyente con `after`, `before`, `page` y `q`. Desconocidos se omiten; duplicados se colapsan.",
+      "Exact product ids (no cursor). Mutually exclusive with `after`, `before`, `page`, and `q`. Unknown ids are omitted; duplicates collapse.",
   })
   @IsOptional()
   @Transform(toIdList)

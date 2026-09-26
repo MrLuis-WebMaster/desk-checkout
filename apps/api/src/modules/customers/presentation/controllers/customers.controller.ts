@@ -41,7 +41,7 @@ export class CustomersController {
 
   @Post()
   @Throttle(STRICT_THROTTLE)
-  @ApiOperation({ summary: "Crear un cliente" })
+  @ApiOperation({ summary: "Create a customer" })
   @ApiCreatedResponse({ schema: apiSuccessSchema(CustomerResponseDto) })
   async create(@Body() body: CreateCustomerDto) {
     const result = await this.createCustomer.execute(body);
@@ -57,7 +57,7 @@ export class CustomersController {
 
   @Get(":id")
   @Throttle(STRICT_THROTTLE)
-  @ApiOperation({ summary: "Obtener un cliente por id" })
+  @ApiOperation({ summary: "Get a customer by id" })
   @ApiOkResponse({ schema: apiSuccessSchema(CustomerResponseDto) })
   @ApiNotFoundResponse({ type: ApiFailureDto })
   async show(@Param() params: CustomerParamsDto) {

@@ -5,7 +5,7 @@ export function setupSwagger(app: INestApplication): void {
   const config = new DocumentBuilder()
     .setTitle("Checkout API")
     .setDescription(
-      "Catálogo, tarifas de envío y transacciones guest del checkout.",
+      "Catalog, shipping rates, and guest checkout transactions.",
     )
     .setVersion("1.0")
     .build();
