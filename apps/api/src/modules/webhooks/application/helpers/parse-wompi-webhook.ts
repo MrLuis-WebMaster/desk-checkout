@@ -1,9 +1,16 @@
-import { mapWompiStatus } from "../../../settlement/infrastructure/wompi/map-wompi-status.js";
-import type { ValidatedWompiTransactionEvent } from "../use-cases/handle-wompi-event.use-case.js";
+import { mapWompiStatus } from "#modules/payments/infrastructure/wompi/map-wompi-status.js";
+import type { TransactionStatus } from "@checkout/contracts";
 import {
   verifyWompiEventChecksum,
   type WompiEventPayload,
 } from "./wompi-event-checksum.js";
+
+export type ValidatedWompiTransactionEvent = {
+  providerId: string;
+  status: TransactionStatus;
+  reference?: string;
+  amountInCents?: number;
+};
 
 export type ParseWompiWebhookResult =
   | { outcome: "ok"; event: ValidatedWompiTransactionEvent }

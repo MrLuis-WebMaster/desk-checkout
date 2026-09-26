@@ -5,7 +5,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
-import type { ShippingCityCode } from "@checkout/contracts";
+import { DeliveryStatus, type ShippingCityCode } from "@checkout/contracts";
 
 @Entity({ name: "deliveries" })
 export class DeliveryOrmEntity {
@@ -20,6 +20,13 @@ export class DeliveryOrmEntity {
 
   @Column({ type: "varchar", length: 20 })
   city!: ShippingCityCode;
+
+  @Column({
+    type: "varchar",
+    length: 20,
+    default: DeliveryStatus.Pending,
+  })
+  status!: DeliveryStatus;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   createdAt!: Date;

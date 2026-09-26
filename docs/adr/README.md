@@ -11,3 +11,5 @@ Short ADRs for checkout settlement and deploy constraints. Status is **Accepted*
 | [0005](0005-dist-only-migrate-on-start.md) | Dist-only migrate-on-start |
 | [0006](0006-integer-cop-money.md) | Integer COP money |
 | [0007](0007-stock-decrement-on-approved-only.md) | Stock decrement only on APPROVED |
+| [0008](0008-rabbitmq-asynchronous-messaging.md) | RabbitMQ for async payment events |
+| [0009](0009-transactional-outbox.md) | Transactional outbox for order.confirmed |

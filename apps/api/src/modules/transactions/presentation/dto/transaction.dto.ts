@@ -17,6 +17,7 @@ import {
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import {
+  DeliveryStatus,
   SHIPPING_CITY_CODES,
   TransactionStatus,
   type CreateTransactionRequest,
@@ -181,6 +182,20 @@ export class TransactionLineResponseDto {
   quantity!: number;
 }
 
+export class TransactionDeliveryResponseDto {
+  @ApiProperty({ format: "uuid" })
+  shippingMethodId!: string;
+
+  @ApiProperty()
+  addressLine!: string;
+
+  @ApiProperty({ enum: SHIPPING_CITY_CODES })
+  city!: ShippingCityCode;
+
+  @ApiProperty({ enum: DeliveryStatus })
+  status!: DeliveryStatus;
+}
+
 export class TransactionResponseDto implements TransactionDto {
   @ApiProperty({ format: "uuid" })
   id!: string;
@@ -223,8 +238,8 @@ export class TransactionResponseDto implements TransactionDto {
   @ApiProperty({ type: CreateTransactionCustomerDto })
   customer!: CreateTransactionCustomerDto;
 
-  @ApiProperty({ type: CreateTransactionDeliveryDto })
-  delivery!: CreateTransactionDeliveryDto;
+  @ApiProperty({ type: TransactionDeliveryResponseDto })
+  delivery!: TransactionDeliveryResponseDto;
 
   @ApiProperty({ format: "date-time" })
   createdAt!: string;

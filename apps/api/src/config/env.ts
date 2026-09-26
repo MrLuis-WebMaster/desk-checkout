@@ -30,10 +30,13 @@ export const apiEnvSchema = z.object({
     .enum(["0", "1", "true", "false"])
     .optional()
     .transform((value) => value === undefined || value === "1" || value === "true"),
+  RABBITMQ_URL: z.string().min(1).optional(),
   WOMPI_BASE_URL: z.string().default(""),
   WOMPI_PUBLIC_KEY: z.string().default(""),
   WOMPI_PRIVATE_KEY: z.string().default(""),
   WOMPI_INTEGRITY_SECRET: z.string().default(""),
+  WOMPI_EVENTS_SECRET: z.string().default(""),
+  WEBHOOK_MAX_SKEW_SECONDS: z.coerce.number().int().positive().default(300),
 }).superRefine((value, ctx) => {
   if (value.NODE_ENV === "test") {
     return;
@@ -42,6 +45,7 @@ export const apiEnvSchema = z.object({
     "WOMPI_PUBLIC_KEY",
     "WOMPI_PRIVATE_KEY",
     "WOMPI_INTEGRITY_SECRET",
+    "WOMPI_EVENTS_SECRET",
   ] as const;
   if (value.NODE_ENV === "production" && value.WOMPI_BASE_URL.trim().length === 0) {
     ctx.addIssue({
@@ -68,9 +72,22 @@ export const apiEnvSchema = z.object({
       });
     }
   }
+  // Production must set an explicit broker URL (no localhost/guest default).
+  if (
+    value.NODE_ENV === "production" &&
+    (!value.RABBITMQ_URL || value.RABBITMQ_URL.trim().length === 0)
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["RABBITMQ_URL"],
+      message: "Required",
+    });
+  }
 });
 
-export type ApiEnv = z.infer<typeof apiEnvSchema>;
+export type ApiEnv = Omit<z.infer<typeof apiEnvSchema>, "RABBITMQ_URL"> & {
+  RABBITMQ_URL: string;
+};
 
 const API_ENV_KEYS = [
   "PORT",
@@ -82,10 +99,13 @@ const API_ENV_KEYS = [
   "DB_NAME",
   "NODE_ENV",
   "ENABLE_SWAGGER",
+  "RABBITMQ_URL",
   "WOMPI_BASE_URL",
   "WOMPI_PUBLIC_KEY",
   "WOMPI_PRIVATE_KEY",
   "WOMPI_INTEGRITY_SECRET",
+  "WOMPI_EVENTS_SECRET",
+  "WEBHOOK_MAX_SKEW_SECONDS",
 ] as const;
 
 export function loadEnvironment(): void {
@@ -121,10 +141,16 @@ export function parseApiEnv(source: NodeJS.ProcessEnv = process.env): ApiEnv {
     throw new Error(`Invalid API environment:\n${details}`);
   }
   const data = parsed.data;
-  if (data.NODE_ENV !== "production" && data.WOMPI_BASE_URL.trim().length === 0) {
-    return { ...data, WOMPI_BASE_URL: "https://sandbox.wompi.co/v1" };
+  const withRabbit: ApiEnv = {
+    ...data,
+    RABBITMQ_URL:
+      data.RABBITMQ_URL?.trim() ||
+      "amqp://guest:guest@localhost:5672",
+  };
+  if (withRabbit.NODE_ENV !== "production" && withRabbit.WOMPI_BASE_URL.trim().length === 0) {
+    return { ...withRabbit, WOMPI_BASE_URL: "https://sandbox.wompi.co/v1" };
   }
-  return data;
+  return withRabbit;
 }
 
 loadEnvironment();

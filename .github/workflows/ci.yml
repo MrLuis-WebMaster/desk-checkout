@@ -42,6 +42,46 @@ jobs:
       - name: Test with coverage
         run: pnpm test:cov
 
+  messaging-integration:
+    name: messaging-integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      rabbitmq:
+        image: rabbitmq:4-management
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.30.3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build messaging package
+        run: pnpm --filter @checkout/messaging... build
+
+      - name: RabbitMQ integration tests
+        env:
+          RABBITMQ_URL: amqp://guest:guest@localhost:5672
+        run: pnpm --filter @checkout/messaging test:integration
+
   audit:
     name: audit
     runs-on: ubuntu-latest

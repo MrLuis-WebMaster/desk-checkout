@@ -8,6 +8,7 @@ const {
   errorMessage,
   lines,
   total,
+  deliveryStatus,
   view,
   toneClass,
   iconWrapClass,
@@ -49,6 +50,12 @@ const {
         {{ view.title }}
       </h1>
       <p class="mt-2 max-w-[65ch] text-muted">{{ view.detail }}</p>
+      <p
+        v-if="deliveryStatus"
+        class="mt-3 text-sm text-muted"
+      >
+        Delivery status: {{ deliveryStatus }}
+      </p>
 
       <section
         class="mt-8 border-y border-line py-4"

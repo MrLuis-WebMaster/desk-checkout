@@ -1,0 +1,12 @@
+{
+  "extends": "@checkout/tsconfig/base.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "types": ["node", "jest"]
+  },
+  "include": ["src"],
+  "exclude": ["src/**/*.spec.ts", "src/**/*.integration.spec.ts"]
+}

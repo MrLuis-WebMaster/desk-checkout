@@ -1,4 +1,4 @@
-import { TransactionStatus } from "@checkout/contracts";
+import { DeliveryStatus, TransactionStatus } from "@checkout/contracts";
 import { Money } from "#shared/domain/money.js";
 import { Transaction } from "../../domain/transaction/transaction.js";
 import { toTransactionDto } from "./transaction-dto.mapper";
@@ -52,7 +52,10 @@ describe("toTransactionDto", () => {
       deliveryFee: 1500,
       total: 12000,
       customer: transaction.customer,
-      delivery: transaction.delivery,
+      delivery: {
+        ...transaction.delivery,
+        status: DeliveryStatus.Pending,
+      },
       createdAt: "2026-01-01T00:00:00.000Z",
     });
   });

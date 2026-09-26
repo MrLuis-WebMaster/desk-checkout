@@ -8,6 +8,7 @@ import {
 } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 import {
+  DeliveryStatus,
   SHIPPING_CITY_CODES,
   type CreateDeliveryRequest,
   type DeliveryDto,
@@ -53,4 +54,7 @@ export class DeliveryResponseDto implements DeliveryDto {
 
   @ApiProperty({ enum: SHIPPING_CITY_CODES })
   city!: ShippingCityCode;
+
+  @ApiProperty({ enum: DeliveryStatus })
+  status!: DeliveryStatus;
 }

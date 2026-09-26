@@ -13,15 +13,15 @@ export const workerEnvSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
+  RABBITMQ_URL: z.string().min(1).optional(),
   WOMPI_BASE_URL: z.string().default(""),
   WOMPI_PUBLIC_KEY: z.string().default(""),
   WOMPI_PRIVATE_KEY: z.string().default(""),
   WOMPI_INTEGRITY_SECRET: z.string().default(""),
-  WOMPI_EVENTS_SECRET: z.string().default(""),
   STUCK_PENDING_AFTER_MS: z.coerce.number().int().positive().default(120_000),
   ORPHAN_PENDING_TTL_MS: z.coerce.number().int().positive().default(1_800_000),
   JOB_INTERVAL_MS: z.coerce.number().int().positive().default(60_000),
-  WEBHOOK_MAX_SKEW_SECONDS: z.coerce.number().int().positive().default(300),
+  OUTBOX_POLL_MS: z.coerce.number().int().positive().default(5_000),
 }).superRefine((value, ctx) => {
   if (value.NODE_ENV === "test") {
     return;
@@ -30,7 +30,6 @@ export const workerEnvSchema = z.object({
     "WOMPI_PUBLIC_KEY",
     "WOMPI_PRIVATE_KEY",
     "WOMPI_INTEGRITY_SECRET",
-    "WOMPI_EVENTS_SECRET",
   ] as const;
   if (value.NODE_ENV === "production" && value.WOMPI_BASE_URL.trim().length === 0) {
     ctx.addIssue({
@@ -57,9 +56,21 @@ export const workerEnvSchema = z.object({
       });
     }
   }
+  if (
+    value.NODE_ENV === "production" &&
+    (!value.RABBITMQ_URL || value.RABBITMQ_URL.trim().length === 0)
+  ) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["RABBITMQ_URL"],
+      message: "Required",
+    });
+  }
 });
 
-export type WorkerEnv = z.infer<typeof workerEnvSchema>;
+export type WorkerEnv = Omit<z.infer<typeof workerEnvSchema>, "RABBITMQ_URL"> & {
+  RABBITMQ_URL: string;
+};
 
 const WORKER_ENV_KEYS = [
   "PORT",
@@ -69,15 +80,15 @@ const WORKER_ENV_KEYS = [
   "DB_PASSWORD",
   "DB_NAME",
   "NODE_ENV",
+  "RABBITMQ_URL",
   "WOMPI_BASE_URL",
   "WOMPI_PUBLIC_KEY",
   "WOMPI_PRIVATE_KEY",
   "WOMPI_INTEGRITY_SECRET",
-  "WOMPI_EVENTS_SECRET",
   "STUCK_PENDING_AFTER_MS",
   "ORPHAN_PENDING_TTL_MS",
   "JOB_INTERVAL_MS",
-  "WEBHOOK_MAX_SKEW_SECONDS",
+  "OUTBOX_POLL_MS",
 ] as const;
 
 export function loadEnvironment(): void {
@@ -124,10 +135,16 @@ export function parseWorkerEnv(
     throw new Error(`Invalid worker environment:\n${details}`);
   }
   const data = parsed.data;
-  if (data.NODE_ENV !== "production" && data.WOMPI_BASE_URL.trim().length === 0) {
-    return { ...data, WOMPI_BASE_URL: "https://sandbox.wompi.co/v1" };
+  const withRabbit: WorkerEnv = {
+    ...data,
+    RABBITMQ_URL:
+      data.RABBITMQ_URL?.trim() ||
+      "amqp://guest:guest@localhost:5672",
+  };
+  if (withRabbit.NODE_ENV !== "production" && withRabbit.WOMPI_BASE_URL.trim().length === 0) {
+    return { ...withRabbit, WOMPI_BASE_URL: "https://sandbox.wompi.co/v1" };
   }
-  return data;
+  return withRabbit;
 }
 
 loadEnvironment();

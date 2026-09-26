@@ -6,13 +6,16 @@ import {
   DeliveryOrmEntity,
   IdempotencyKeyOrmEntity,
   InventoryOrmEntity,
+  OutboxEventOrmEntity,
   TransactionOrmEntity,
 } from "@checkout/settlement-typeorm";
 import { env } from "./config/env.js";
 import { HealthModule } from "./modules/health/health.module.js";
+import { NotificationsModule } from "./modules/notifications/presentation/notifications.module.js";
+import { OutboxModule } from "./modules/outbox/presentation/outbox.module.js";
+import { PaymentsMessagingModule } from "./modules/payments/presentation/payments-messaging.module.js";
 import { ReconciliationModule } from "./modules/reconciliation/presentation/reconciliation.module.js";
 import { SettlementModule } from "./modules/settlement/presentation/settlement.module.js";
-import { WebhooksModule } from "./modules/webhooks/presentation/webhooks.module.js";
 
 @Module({
   imports: [
@@ -32,12 +35,15 @@ import { WebhooksModule } from "./modules/webhooks/presentation/webhooks.module.
         TransactionOrmEntity,
         IdempotencyKeyOrmEntity,
         InventoryOrmEntity,
+        OutboxEventOrmEntity,
       ],
       autoLoadEntities: true,
     }),
     HealthModule,
     SettlementModule,
-    WebhooksModule,
+    PaymentsMessagingModule,
+    OutboxModule,
+    NotificationsModule,
     ReconciliationModule,
   ],
 })
