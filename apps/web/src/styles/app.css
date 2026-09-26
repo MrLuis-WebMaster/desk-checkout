@@ -38,6 +38,11 @@
     outline-offset: 2px;
   }
 
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
   @keyframes add-pop {
     0% {
       transform: scale(1);
