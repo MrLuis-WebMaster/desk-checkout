@@ -71,6 +71,7 @@ function addToCart() {
           :alt="product.name"
           width="640"
           height="640"
+          priority
           class="mx-auto aspect-square w-full object-contain"
         />
       </div>

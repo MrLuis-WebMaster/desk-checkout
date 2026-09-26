@@ -5,10 +5,14 @@ import {
   productImageSrc,
 } from "@/shared/presentation/product-image";
 
-const props = defineProps<{
-  src: string;
-  alt: string;
-}>();
+const props = withDefaults(
+  defineProps<{
+    src: string;
+    alt: string;
+    priority?: boolean;
+  }>(),
+  { priority: false },
+);
 
 const currentSrc = ref(productImageSrc(props.src));
 
@@ -29,5 +33,12 @@ function onError() {
 </script>
 
 <template>
-  <img :src="currentSrc" :alt="alt" @error="onError" />
+  <img
+    :src="currentSrc"
+    :alt="alt"
+    :loading="priority ? 'eager' : 'lazy'"
+    decoding="async"
+    :fetchpriority="priority ? 'high' : 'auto'"
+    @error="onError"
+  />
 </template>
